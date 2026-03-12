@@ -33,80 +33,13 @@ function isPhishingUrl(url) {
 }
 
 // --- Google Safe Browsing Integration ---
+// Checks a URL against Google's real-time threat database.
+// Covers: malware, phishing, unwanted software, social engineering.
 const GSB_API_ENDPOINT = "https://safebrowsing.googleapis.com/v4/threatMatches:find";
+
 const BUILT_IN_API_KEY = "AIzaSyC-7Q6moS7I5d3p8eAY1ewOcJMHvILYAHw";
 
-// --- Optimization 1: Trusted domain whitelist ---
-const TRUSTED_DOMAINS = new Set([
-  "google.com","googleapis.com","gstatic.com","googleusercontent.com","gmail.com",
-  "youtube.com","youtu.be","ytimg.com","ggpht.com",
-  "microsoft.com","bing.com","live.com","outlook.com","office.com","microsoft365.com",
-  "apple.com","icloud.com",
-  "amazon.com","amazonaws.com","cloudfront.net",
-  "facebook.com","instagram.com","fbcdn.net","meta.com",
-  "twitter.com","x.com","twimg.com",
-  "linkedin.com","licdn.com",
-  "wikipedia.org","wikimedia.org",
-  "reddit.com","redd.it","redditstatic.com",
-  "netflix.com","nflxso.net",
-  "spotify.com","scdn.co",
-  "github.com","githubusercontent.com","githubassets.com",
-  "stackoverflow.com","sstatic.net",
-  "cloudflare.com","cloudflareinsights.com",
-  "akamaized.net","akamai.com",
-  "whatsapp.com","whatsapp.net",
-  "zoom.us","zoomgov.com",
-  "dropbox.com","dropboxstatic.com",
-  "adobe.com","typekit.net",
-  "paypal.com","paypalobjects.com",
-  "stripe.com","stripecdn.com",
-  "yahoo.com","yimg.com",
-  "opera.com","operacdn.com",
-]);
-
-function isTrustedDomain(url) {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    for (const trusted of TRUSTED_DOMAINS) {
-      if (host === trusted || host.endsWith("." + trusted)) return true;
-    }
-  } catch {}
-  return false;
-}
-
-// --- Optimization 2: Domain result cache (1 hour TTL) ---
-const CACHE_TTL_MS = 60 * 60 * 1000;
-const domainCache = new Map();
-
-function getCachedResult(url) {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    const entry = domainCache.get(host);
-    if (entry && (Date.now() - entry.timestamp) < CACHE_TTL_MS) return entry.result;
-    domainCache.delete(host);
-  } catch {}
-  return null;
-}
-
-function setCachedResult(url, result) {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    domainCache.set(host, { result, timestamp: Date.now() });
-    if (domainCache.size > 500) {
-      const oldest = [...domainCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
-      domainCache.delete(oldest[0]);
-    }
-  } catch {}
-}
-
-// --- Optimization 3: Per-tab subframe domain dedup ---
-const checkedDomainsPerTab = new Map();
-
 async function checkGoogleSafeBrowsing(url) {
-  // Check cache first — skip API call if we already know this domain's status
-  const cached = getCachedResult(url);
-  if (cached !== null) return cached;
-
   const { safeBrowsingApiKey } = await new Promise((resolve) =>
     chrome.storage.local.get({ safeBrowsingApiKey: "" }, resolve)
   );
@@ -146,15 +79,12 @@ async function checkGoogleSafeBrowsing(url) {
         UNWANTED_SOFTWARE: "unwanted-software",
         POTENTIALLY_HARMFUL_APPLICATION: "harmful-app",
       };
-      const threatResult = { threat: true, reason: reasonMap[threatType] || "malware" };
-      setCachedResult(url, threatResult);
-      return threatResult;
+      return { threat: true, reason: reasonMap[threatType] || "malware" };
     }
 
-    const safeResult = { threat: false, reason: null };
-    setCachedResult(url, safeResult);
-    return safeResult;
+    return { threat: false, reason: null };
   } catch (err) {
+    // Network error or API issue — fail open (don't block)
     console.warn("[Shield] Safe Browsing API error:", err);
     return { threat: false, reason: null };
   }
@@ -176,7 +106,7 @@ function normalizeHost(input) {
 async function getStorage() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      { blocklist: [], whitelist: [], enabled: true },
+      { blocklist: [], enabled: true },
       resolve
     );
   });
@@ -209,27 +139,6 @@ async function checkAndBlock(tabId, url, frameId) {
   // Skip internal pages
   if (!url || url.startsWith("chrome://") || url.startsWith("chrome-extension://") ||
       url.startsWith("about:") || url.startsWith("data:") || url.startsWith("blob:")) return;
-
-  // Skip trusted well-known domains entirely — no API call needed
-  if (isTrustedDomain(url)) return;
-
-  // Skip user-whitelisted domains
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    const { whitelist } = await new Promise(r => chrome.storage.local.get({ whitelist: [] }, r));
-    if (whitelist.some(entry => host === entry || host.endsWith("." + entry))) return;
-  } catch {}
-
-  // For subframes: skip if we already checked this domain for this tab
-  if (!isMainFrame) {
-    try {
-      const host = new URL(url).hostname.replace(/^www\./, "");
-      if (!checkedDomainsPerTab.has(tabId)) checkedDomainsPerTab.set(tabId, new Set());
-      const checked = checkedDomainsPerTab.get(tabId);
-      if (checked.has(host)) return;
-      checked.add(host);
-    } catch {}
-  }
 
   // Handle allow-once flag
   if (url.includes("__shield_allow=1")) {
@@ -332,16 +241,10 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
   }
 });
 
-// Clean up tab tracking when tab is closed
+// Clean up tab history when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabPrevUrl.delete(tabId);
-  checkedDomainsPerTab.delete(tabId);
 });
-
-// Reset per-tab subframe dedup on new main-frame navigation
-chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-  if (details.frameId === 0) checkedDomainsPerTab.delete(details.tabId);
-}, { urls: ["<all_urls>"] });
 
 // --- Download Protection ---
 // Intercept downloads and check the source URL against Safe Browsing
@@ -381,7 +284,7 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "GET_STATUS") {
     chrome.storage.local.get(
-      { blocklist: [], whitelist: [], enabled: true, safeBrowsingApiKey: "", totalBlocked: 0 },
+      { blocklist: [], enabled: true, safeBrowsingApiKey: "", totalBlocked: 0 },
       sendResponse
     );
     return true;
@@ -417,31 +320,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const updated = blocklist.filter((s) => s !== msg.site);
       chrome.storage.local.set({ blocklist: updated }, () =>
         sendResponse({ ok: true, blocklist: updated })
-      );
-    });
-    return true;
-  }
-
-  if (msg.type === "ADD_WHITELIST") {
-    chrome.storage.local.get({ whitelist: [] }, ({ whitelist }) => {
-      const host = normalizeHost(msg.site);
-      if (!host || whitelist.includes(host)) {
-        sendResponse({ ok: false, error: "Already exists or invalid" });
-        return;
-      }
-      const updated = [...whitelist, host];
-      chrome.storage.local.set({ whitelist: updated }, () =>
-        sendResponse({ ok: true, whitelist: updated })
-      );
-    });
-    return true;
-  }
-
-  if (msg.type === "REMOVE_WHITELIST") {
-    chrome.storage.local.get({ whitelist: [] }, ({ whitelist }) => {
-      const updated = whitelist.filter(s => s !== msg.site);
-      chrome.storage.local.set({ whitelist: updated }, () =>
-        sendResponse({ ok: true, whitelist: updated })
       );
     });
     return true;
