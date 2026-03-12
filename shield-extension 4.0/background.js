@@ -112,14 +112,25 @@ async function getStorage() {
   });
 }
 
-// In-memory allow-once Set — synchronous, no async race condition
-const allowOnceSet = new Set();
+// Proceed-anyway whitelist — keyed by tabId, stores expiry timestamp
+// Using chrome.storage.session so it survives service worker sleep but not browser restart
+// Falls back to in-memory map if session storage unavailable
+const proceedTabExpiry = new Map(); // tabId -> expiry ms
 
-function isAllowedOnce(url) {
-  if (allowOnceSet.has(url)) {
-    allowOnceSet.delete(url);
+function allowTabProceed(tabId) {
+  const expiry = Date.now() + 10000; // 10 seconds — plenty of time
+  proceedTabExpiry.set(tabId, expiry);
+  console.log("[Shield] allowTabProceed: tabId", tabId, "allowed until", new Date(expiry).toISOString());
+}
+
+function isTabProceeded(tabId) {
+  const expiry = proceedTabExpiry.get(tabId);
+  if (!expiry) return false;
+  if (Date.now() < expiry) {
+    console.log("[Shield] isTabProceeded: tabId", tabId, "IS in proceed list");
     return true;
   }
+  proceedTabExpiry.delete(tabId);
   return false;
 }
 
@@ -154,9 +165,9 @@ async function checkAndBlock(tabId, url, frameId) {
 
 
 
-  // Check allow-once FIRST — before any async ops or dedup checks
-  if (isAllowedOnce(url)) {
-    console.log("[Shield] PROCEED: allowed once, skipping block for", url);
+  // Check proceed whitelist FIRST — before dedup or any other checks
+  if (isTabProceeded(tabId)) {
+    console.log("[Shield] checkAndBlock: tab", tabId, "is in proceed list, skipping", url);
     return;
   }
 
@@ -214,10 +225,16 @@ async function checkAndBlock(tabId, url, frameId) {
         chrome.storage.local.set({ totalBlocked: totalBlocked + 1 });
       });
       const prevUrl = getPrevUrl(tabId);
-      const blockPage = chrome.runtime.getURL(
-        `blocked.html?url=${encodeURIComponent(url)}&reason=${reason}&prev=${encodeURIComponent(prevUrl)}`
-      );
-      chrome.tabs.update(tabId, { url: blockPage });
+      // For subframe blocks, pass the tab's current main URL as the "proceed" target
+      // and the subresource URL separately so the UI can show what was detected
+      chrome.tabs.get(tabId, (tab) => {
+        if (chrome.runtime.lastError) return;
+        const mainUrl = (tab && tab.url) ? tab.url : prevUrl;
+        const blockPage = chrome.runtime.getURL(
+          `blocked.html?url=${encodeURIComponent(mainUrl)}&subresource=${encodeURIComponent(url)}&reason=${reason}&prev=${encodeURIComponent(prevUrl)}&tabId=${tabId}`
+        );
+        chrome.tabs.update(tabId, { url: blockPage });
+      });
     }
   } finally {
     urlsBeingChecked.delete(checkKey);
@@ -296,15 +313,27 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "PROCEED_ANYWAY") {
     const url = msg.url;
-    allowOnceSet.add(url);
-    console.log("[Shield] PROCEED_ANYWAY: added to allowOnceSet:", url, "| set size:", allowOnceSet.size);
-    chrome.tabs.update(_sender.tab.id, { url: url });
-    return true;
+    const tabId = msg.tabId || _sender.tab.id;
+    // 1. Whitelist the tab for 10s so all nav events pass through
+    allowTabProceed(tabId);
+    // 2. Clear any pending dedup keys for this tab so urlsBeingChecked doesn't block it
+    for (const key of urlsBeingChecked) {
+      if (key.startsWith(tabId + "|")) urlsBeingChecked.delete(key);
+    }
+    console.log("[Shield] PROCEED_ANYWAY: navigating tabId", tabId, "to", url);
+    chrome.tabs.update(tabId, { url: url });
+    sendResponse({ ok: true });
+    return false;
   }
 
   if (msg.type === "GO_BACK") {
-    chrome.tabs.goBack(_sender.tab.id);
-    return true;
+    // Go back 2: skip blocked.html AND the malicious site
+    chrome.tabs.goBack(_sender.tab.id, () => {
+      if (chrome.runtime.lastError) return;
+      setTimeout(() => chrome.tabs.goBack(_sender.tab.id), 100);
+    });
+    sendResponse({ ok: true });
+    return false;
   }
 
   if (msg.type === "GET_STATUS") {

@@ -4,6 +4,8 @@
   var reason  = params.get("reason") || "blocklist";
   var blocked = params.get("url")  ? decodeURIComponent(params.get("url"))  : "";
   var prevUrl = params.get("prev") ? decodeURIComponent(params.get("prev")) : "";
+  var tabId   = params.get("tabId") ? parseInt(params.get("tabId")) : null;
+  var subresource = params.get("subresource") ? decodeURIComponent(params.get("subresource")) : null;
 
   // Populate URL box right away
   document.getElementById("blocked-url").textContent = blocked || "Unknown URL";
@@ -144,11 +146,14 @@
   // ---- GO BACK BUTTON ----
   document.getElementById("btn-back").onclick = function() {
     if (prevUrl && prevUrl.indexOf("http") === 0) {
+      // prevUrl is the safe page before the malicious site — go there directly
       window.location.href = prevUrl;
+    } else if (history.length > 2) {
+      // Skip back 2: blocked.html → malicious site → safe page
+      history.go(-2);
     } else if (history.length > 1) {
-      history.back();
+      history.go(-1);
     } else {
-      // Ask the background to navigate the tab back
       chrome.runtime.sendMessage({ type: "GO_BACK" });
     }
   };
@@ -157,7 +162,9 @@
   // Chrome extensions block window.confirm() — use an inline confirm overlay instead
   function proceedNow() {
     if (!blocked) return;
-    chrome.runtime.sendMessage({ type: "PROCEED_ANYWAY", url: blocked });
+    var msg = { type: "PROCEED_ANYWAY", url: blocked };
+    if (tabId) msg.tabId = tabId;
+    chrome.runtime.sendMessage(msg);
   }
 
   function showConfirmOverlay() {
