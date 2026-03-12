@@ -1,5 +1,6 @@
 // Shield – Content Script
 // Scans links on hover for phishing patterns and homoglyph/unicode spoofing
+// + inline safe/unsafe badges on all links (Google Search & general pages)
 
 (() => {
   // ─── Homoglyph Map ───────────────────────────────────────────────────────────
@@ -237,6 +238,181 @@
     hideTimer = setTimeout(() => { if (tooltip) tooltip.style.display = 'none'; }, 160);
   }
 
+  // ─── Badge Rendering ─────────────────────────────────────────────────────────
+
+  // Inject shared badge styles once
+  function injectBadgeStyles() {
+    if (document.getElementById('__shield_badge_styles__')) return;
+    const style = document.createElement('style');
+    style.id = '__shield_badge_styles__';
+    style.textContent = `
+      .__shield_badge__ {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        font-size: 10px;
+        line-height: 1;
+        margin-left: 5px;
+        vertical-align: middle;
+        flex-shrink: 0;
+        cursor: default;
+        position: relative;
+        top: -1px;
+        font-style: normal;
+        font-weight: normal;
+        text-decoration: none !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        transition: transform 0.12s ease;
+        z-index: 9999;
+      }
+      .__shield_badge__:hover { transform: scale(1.25); }
+      .__shield_badge_safe__ {
+        background: #16a34a;
+        color: #fff;
+        border: 1.5px solid #15803d;
+        font-size: 9px;
+      }
+      .__shield_badge_unsafe__ {
+        background: #dc2626;
+        color: #fff;
+        border: 1.5px solid #b91c1c;
+        font-size: 11px;
+      }
+      .__shield_badge_checking__ {
+        background: #94a3b8;
+        color: #fff;
+        border: 1.5px solid #64748b;
+        font-size: 8px;
+        animation: __shield_pulse__ 1s infinite;
+      }
+      @keyframes __shield_pulse__ {
+        0%,100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+    `;
+    document.documentElement.appendChild(style);
+  }
+
+  // Create a badge element
+  function createBadge(state) {
+    const span = document.createElement('span');
+    span.className = `__shield_badge__ __shield_badge_${state}__`;
+    span.setAttribute('data-shield-badge', state);
+    if (state === 'safe')     { span.textContent = '✓'; span.title = 'Shield: Link appears safe'; }
+    if (state === 'unsafe')   { span.textContent = '✕'; span.title = 'Shield: Unsafe link detected!'; }
+    if (state === 'checking') { span.textContent = '…'; span.title = 'Shield: Checking link…'; }
+    return span;
+  }
+
+  // Check a URL via background (GSB + local patterns)
+  const gsbCache = new Map(); // url → { safe: bool, threats: [] }
+
+  async function checkUrlFull(url) {
+    if (gsbCache.has(url)) return gsbCache.get(url);
+
+    // Local check first (instant)
+    const localThreats = analyzeUrl(url);
+    if (localThreats.length > 0) {
+      const result = { safe: false, threats: localThreats };
+      gsbCache.set(url, result);
+      return result;
+    }
+
+    // Ask background worker for GSB result
+    return new Promise(resolve => {
+      try {
+        chrome.runtime.sendMessage({ type: 'SCAN_LINK', url }, response => {
+          if (chrome.runtime.lastError || !response) {
+            const r = { safe: true, threats: [] };
+            gsbCache.set(url, r);
+            resolve(r);
+            return;
+          }
+          const r = { safe: !response.unsafe, threats: response.threats || [] };
+          gsbCache.set(url, r);
+          resolve(r);
+        });
+      } catch {
+        const r = { safe: true, threats: [] };
+        gsbCache.set(url, r);
+        resolve(r);
+      }
+    });
+  }
+
+  // Should we badge this link?
+  function shouldBadge(link) {
+    const url = link.href;
+    if (!url) return false;
+    if (url.startsWith('javascript:') || url.startsWith('mailto:') ||
+        url.startsWith('tel:') || url.startsWith('#') ||
+        url.startsWith('chrome-extension://') || url.startsWith('chrome://')) return false;
+    // Skip Shield's own blocked page
+    if (url.includes('blocked.html')) return false;
+    return true;
+  }
+
+  // Insert badge right after the link (or inside for Google result titles)
+  function insertBadge(link, badge) {
+    // For Google Search result title links, insert inside the link at the end
+    // to keep layout intact
+    const isGoogleTitle = link.closest('h3') || link.closest('[data-ved]');
+    if (isGoogleTitle) {
+      // Wrap in a non-breaking inline span inside link
+      link.appendChild(badge);
+    } else {
+      // Insert after the link in the DOM
+      if (link.nextSibling) {
+        link.parentNode.insertBefore(badge, link.nextSibling);
+      } else {
+        link.parentNode.appendChild(badge);
+      }
+    }
+  }
+
+  async function addBadgeToLink(link) {
+    if (link.__shieldBadged) return;
+    link.__shieldBadged = true;
+    if (!shouldBadge(link)) return;
+
+    injectBadgeStyles();
+
+    const url = link.href;
+
+    // Instantly show checking state
+    const badge = createBadge('checking');
+    try {
+      insertBadge(link, badge);
+    } catch { return; }
+
+    const result = await checkUrlFull(url);
+
+    if (result.safe) {
+      badge.className = `__shield_badge__ __shield_badge_safe__`;
+      badge.textContent = '✓';
+      badge.title = 'Shield: Link appears safe';
+      badge.setAttribute('data-shield-badge', 'safe');
+    } else {
+      badge.className = `__shield_badge__ __shield_badge_unsafe__`;
+      badge.textContent = '✕';
+      badge.setAttribute('data-shield-badge', 'unsafe');
+      const labels = result.threats.map(t => t.label).join(', ');
+      badge.title = `Shield: UNSAFE — ${labels}`;
+
+      // Also add red border on the link itself for visibility
+      link.style.outline = '1.5px solid #dc2626';
+      link.style.outlineOffset = '1px';
+      link.style.borderRadius = '2px';
+    }
+  }
+
+  function badgeAll(root) {
+    root.querySelectorAll('a[href]').forEach(addBadgeToLink);
+  }
+
   // ─── Attach Listeners ────────────────────────────────────────────────────────
 
   const analysisCache = new WeakMap();
@@ -265,15 +441,21 @@
   chrome.storage.local.get({ enabled: true }, ({ enabled }) => {
     if (!enabled) return;
 
+    injectBadgeStyles();
     attachAll(document);
+    badgeAll(document);
 
     // Watch for dynamically injected links (SPAs, Google search pagination, etc.)
     new MutationObserver(mutations => {
       for (const m of mutations)
         for (const node of m.addedNodes)
           if (node.nodeType === 1) {
-            if (node.tagName === 'A' && node.href) attachLink(node);
+            if (node.tagName === 'A' && node.href) {
+              attachLink(node);
+              addBadgeToLink(node);
+            }
             attachAll(node);
+            badgeAll(node);
           }
     }).observe(document.body, { childList: true, subtree: true });
   });

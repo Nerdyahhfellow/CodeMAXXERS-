@@ -112,17 +112,15 @@ async function getStorage() {
   });
 }
 
-// URLs temporarily allowed by "Proceed Anyway" (persisted in storage so it survives service worker sleep)
-async function isAllowedOnce(url) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get({ allowOnceList: [] }, (data) => {
-      const idx = data.allowOnceList.indexOf(url);
-      if (idx === -1) return resolve(false);
-      // Remove it so it only works once
-      const updated = data.allowOnceList.filter((u) => u !== url);
-      chrome.storage.local.set({ allowOnceList: updated }, () => resolve(true));
-    });
-  });
+// In-memory allow-once Set — synchronous, no async race condition
+const allowOnceSet = new Set();
+
+function isAllowedOnce(url) {
+  if (allowOnceSet.has(url)) {
+    allowOnceSet.delete(url);
+    return true;
+  }
+  return false;
 }
 
 // Track previous URL per tab for the Go Back button
@@ -154,17 +152,11 @@ async function checkAndBlock(tabId, url, frameId) {
   if (!url || url.startsWith("chrome://") || url.startsWith("chrome-extension://") ||
       url.startsWith("about:") || url.startsWith("data:") || url.startsWith("blob:")) return;
 
-  // Handle allow-once flag
-  if (url.includes("__shield_allow=1")) {
-    if (isMainFrame) {
-      const cleanUrl = url.replace(/[?&]__shield_allow=1/, "").replace(/\?$/, "");
-      chrome.storage.local.get({ allowOnceList: [] }, (data) => {
-        const updated = [...data.allowOnceList, cleanUrl];
-        chrome.storage.local.set({ allowOnceList: updated }, () => {
-          if (cleanUrl !== url) chrome.tabs.update(tabId, { url: cleanUrl });
-        });
-      });
-    }
+
+
+  // Check allow-once FIRST — before any async ops or dedup checks
+  if (isAllowedOnce(url)) {
+    console.log("[Shield] PROCEED: allowed once, skipping block for", url);
     return;
   }
 
@@ -176,10 +168,6 @@ async function checkAndBlock(tabId, url, frameId) {
   try {
     const { blocklist, enabled } = await getStorage();
     if (!enabled) return;
-
-    if (await isAllowedOnce(url)) {
-      return;
-    }
 
     let shouldBlock = false;
     let reason = "";
@@ -306,6 +294,19 @@ chrome.downloads.onCreated.addListener(async (downloadItem) => {
 
 // Message handler for popup
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "PROCEED_ANYWAY") {
+    const url = msg.url;
+    allowOnceSet.add(url);
+    console.log("[Shield] PROCEED_ANYWAY: added to allowOnceSet:", url, "| set size:", allowOnceSet.size);
+    chrome.tabs.update(_sender.tab.id, { url: url });
+    return true;
+  }
+
+  if (msg.type === "GO_BACK") {
+    chrome.tabs.goBack(_sender.tab.id);
+    return true;
+  }
+
   if (msg.type === "GET_STATUS") {
     chrome.storage.local.get(
       { blocklist: [], enabled: true, safeBrowsingApiKey: "", totalBlocked: 0 },
@@ -352,5 +353,32 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "CHECK_PHISHING") {
     sendResponse({ isPhishing: isPhishingUrl(msg.url) });
     return true;
+  }
+
+  // New: scan a link URL for badge display in content script
+  if (msg.type === "SCAN_LINK") {
+    const url = msg.url;
+    const localUnsafe = isPhishingUrl(url);
+    if (localUnsafe) {
+      sendResponse({ unsafe: true, threats: [{ label: 'Phishing URL', type: 'phishing' }] });
+      return true;
+    }
+    checkGoogleSafeBrowsing(url).then(gsbResult => {
+      if (gsbResult.threat) {
+        const labelMap = {
+          malware: 'Malware',
+          phishing: 'Phishing',
+          'unwanted-software': 'Unwanted Software',
+          'harmful-app': 'Harmful Application',
+        };
+        sendResponse({
+          unsafe: true,
+          threats: [{ label: labelMap[gsbResult.reason] || 'Threat Detected', type: gsbResult.reason }]
+        });
+      } else {
+        sendResponse({ unsafe: false, threats: [] });
+      }
+    }).catch(() => sendResponse({ unsafe: false, threats: [] }));
+    return true; // async
   }
 });

@@ -138,49 +138,55 @@
   document.getElementById("badge-text").textContent      = cfg.badge;
   document.getElementById("title").textContent           = cfg.title;
   document.getElementById("subtitle").textContent        = cfg.subtitle;
-  document.getElementById("threat-card").className       = "threat-card " + cfg.color;
-  document.getElementById("card-title").textContent      = cfg.cardTitle;
-  document.getElementById("threat-what").textContent     = cfg.what;
   document.getElementById("url-label").textContent       = cfg.urlLabel;
   document.getElementById("source-row").textContent      = cfg.source;
-
-  // Risks list
-  var risksHTML = "";
-  for (var i = 0; i < cfg.risks.length; i++) {
-    risksHTML += '<div class="risk-row"><span class="risk-icon">' + cfg.risks[i].icon + '</span><span>' + cfg.risks[i].text + '</span></div>';
-  }
-  document.getElementById("threat-risks").innerHTML = risksHTML;
-
-  // Advice list
-  var adviceHTML = "";
-  for (var j = 0; j < cfg.advice.length; j++) {
-    adviceHTML += '<div class="advice-item">' + cfg.advice[j] + '</div>';
-  }
-  document.getElementById("advice-items").innerHTML = adviceHTML;
 
   // ---- GO BACK BUTTON ----
   document.getElementById("btn-back").onclick = function() {
     if (prevUrl && prevUrl.indexOf("http") === 0) {
       window.location.href = prevUrl;
+    } else if (history.length > 1) {
+      history.back();
     } else {
-      window.close();
+      // Ask the background to navigate the tab back
+      chrome.runtime.sendMessage({ type: "GO_BACK" });
     }
   };
 
   // ---- PROCEED BUTTON ----
+  // Chrome extensions block window.confirm() — use an inline confirm overlay instead
+  function proceedNow() {
+    if (!blocked) return;
+    chrome.runtime.sendMessage({ type: "PROCEED_ANYWAY", url: blocked });
+  }
+
+  function showConfirmOverlay() {
+    var overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
+    overlay.innerHTML =
+      '<div style="background:#0f1117;border:1px solid rgba(239,68,68,0.5);border-radius:14px;padding:28px 24px;max-width:400px;width:100%;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;color:#e2e8f0;">' +
+        '<div style="font-size:28px;text-align:center;margin-bottom:12px;">⚠️</div>' +
+        '<div style="font-size:15px;font-weight:700;color:#ef4444;margin-bottom:10px;text-align:center;">Dangerous Site Warning</div>' +
+        '<div style="font-size:13px;color:#94a3b8;line-height:1.6;margin-bottom:20px;text-align:center;">' +
+          'Google Safe Browsing flagged this site as <strong style="color:#ef4444;">' + cfg.badge + '</strong>.<br>' +
+          'Proceeding may expose your device and personal data to serious risk.' +
+        '</div>' +
+        '<div style="display:flex;gap:10px;">' +
+          '<button id="overlay-cancel" style="flex:1;padding:11px;border-radius:8px;border:1px solid #1e2a3a;background:#131820;color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>' +
+          '<button id="overlay-proceed" style="flex:1;padding:11px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Proceed Anyway</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById("overlay-cancel").onclick = function() { document.body.removeChild(overlay); };
+    document.getElementById("overlay-proceed").onclick = function() { proceedNow(); };
+  }
+
   document.getElementById("btn-proceed").onclick = function() {
     if (reason !== "blocklist") {
-      var ok = window.confirm(
-        "WARNING: " + cfg.badge + "\n\n" +
-        "Google Safe Browsing flagged this site as dangerous.\n\n" +
-        "Proceeding may expose your device and personal data to serious risk.\n\n" +
-        "Are you absolutely sure you want to continue?"
-      );
-      if (!ok) return;
+      showConfirmOverlay();
+    } else {
+      proceedNow();
     }
-    if (!blocked) return;
-    var separator = blocked.indexOf("?") >= 0 ? "&" : "?";
-    window.location.href = blocked + separator + "__shield_allow=1";
   };
 
 })();
