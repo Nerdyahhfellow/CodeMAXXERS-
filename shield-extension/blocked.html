@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Blocked by Shield</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #0a0d14;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #e2e8f0;
+    }
+
+    .container {
+      max-width: 520px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .shield-icon {
+      font-size: 72px;
+      margin-bottom: 20px;
+      filter: drop-shadow(0 0 30px rgba(239, 68, 68, 0.4));
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+
+    .badge.phishing, .badge.malware, .badge.harmful-app, .badge.download {
+      background: rgba(239,68,68,0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+
+    .badge.unwanted-software {
+      background: rgba(245,158,11,0.15);
+      color: #f59e0b;
+      border: 1px solid rgba(245,158,11,0.3);
+    }
+
+    .badge.blocklist {
+      background: rgba(245,158,11,0.15);
+      color: #f59e0b;
+      border: 1px solid rgba(245,158,11,0.3);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 10px;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: #64748b;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    .url-box {
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 28px;
+      word-break: break-all;
+      text-align: left;
+    }
+
+    .url-label {
+      font-size: 10px;
+      color: #374151;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    .btn-back {
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: white;
+    }
+
+    .btn-proceed {
+      background: #1e2533;
+      color: #64748b;
+      border: 1px solid #2d3748;
+    }
+
+    .powered {
+      margin-top: 32px;
+      font-size: 11px;
+      color: #1e2a3a;
+    }
+
+    .warning-list {
+      background: rgba(239,68,68,0.05);
+      border: 1px solid rgba(239,68,68,0.15);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+
+    .warning-list h3 {
+      font-size: 12px;
+      color: #ef4444;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+    }
+
+    .warning-list li {
+      font-size: 12px;
+      color: #64748b;
+      margin-left: 16px;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="shield-icon">🛡️</div>
+    <div class="badge" id="reason-badge">Blocked</div>
+    <h1 id="title">Site Blocked</h1>
+    <p class="subtitle" id="subtitle">Shield has blocked this site to protect you.</p>
+
+    <div class="url-box">
+      <div class="url-label" id="url-label">Blocked URL</div>
+      <div id="blocked-url">—</div>
+    </div>
+
+    <div class="warning-list" id="warning-box" style="display:none">
+      <h3 id="warning-title">⚠️ Why this may be dangerous</h3>
+      <ul id="warning-items"></ul>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-back" id="btn-back">← Go Back</button>
+      <button class="btn btn-proceed" id="btn-proceed">Proceed Anyway</button>
+    </div>
+
+    <div class="powered">Protected by Shield v1.1</div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const reason = params.get("reason") || "blocklist";
+    const url = params.get("url") ? decodeURIComponent(params.get("url")) : "Unknown URL";
+    const tabId = params.get("tabId") ? parseInt(params.get("tabId")) : null;
+    const prevUrl = params.get("prev") ? decodeURIComponent(params.get("prev")) : null;
+
+    document.getElementById("blocked-url").textContent = url;
+
+    const badge   = document.getElementById("reason-badge");
+    const title   = document.getElementById("title");
+    const subtitle = document.getElementById("subtitle");
+    const warningBox = document.getElementById("warning-box");
+    const warningItems = document.getElementById("warning-items");
+    const urlLabel = document.getElementById("url-label");
+
+    const configs = {
+      phishing: {
+        badge: "⚠️ Phishing Detected", badgeClass: "badge phishing",
+        title: "Dangerous Site Blocked",
+        subtitle: "This site has been flagged as a phishing attempt designed to steal your information.",
+        warnings: [
+          "Flagged by Google Safe Browsing as phishing",
+          "May be impersonating a trusted website",
+          "Could steal your login credentials or personal data"
+        ]
+      },
+      malware: {
+        badge: "☣️ Malware Detected", badgeClass: "badge malware",
+        title: "Malware Site Blocked",
+        subtitle: "This site is known to distribute malware that could infect your device.",
+        warnings: [
+          "Flagged by Google Safe Browsing as a malware source",
+          "May silently install harmful software on your device",
+          "Could compromise your files, passwords, or camera"
+        ]
+      },
+      "unwanted-software": {
+        badge: "⚠️ Unwanted Software", badgeClass: "badge unwanted-software",
+        title: "Suspicious Site Blocked",
+        subtitle: "This site is associated with unwanted or deceptive software.",
+        warnings: [
+          "May bundle unwanted software with downloads",
+          "Could change browser settings without permission",
+          "Flagged by Google Safe Browsing"
+        ]
+      },
+      "harmful-app": {
+        badge: "☣️ Harmful App", badgeClass: "badge harmful-app",
+        title: "Harmful Download Blocked",
+        subtitle: "This site hosts applications that may harm your device.",
+        warnings: [
+          "Flagged by Google Safe Browsing as harmful",
+          "Application may contain spyware or ransomware",
+          "Do not download or install anything from this site"
+        ]
+      },
+      download: {
+        badge: "⛔ Dangerous Download", badgeClass: "badge download",
+        title: "Download Blocked",
+        subtitle: "This file has been flagged as malicious by Google Safe Browsing.",
+        warnings: [
+          "File URL matches known malware signatures",
+          "Downloading this file could infect your device",
+          "The source site is flagged as dangerous"
+        ],
+        urlLabel: "Blocked Download URL"
+      },
+      blocklist: {
+        badge: "Blocked Site", badgeClass: "badge blocklist",
+        title: "Site Blocked",
+        subtitle: "This website is on your blocklist. Shield prevented you from visiting it.",
+        warnings: []
+      }
+    };
+
+    const cfg = configs[reason] || configs.blocklist;
+    badge.textContent = cfg.badge;
+    badge.className = cfg.badgeClass;
+    title.textContent = cfg.title;
+    subtitle.textContent = cfg.subtitle;
+    if (cfg.urlLabel) urlLabel.textContent = cfg.urlLabel;
+
+    if (cfg.warnings && cfg.warnings.length > 0) {
+      warningItems.innerHTML = cfg.warnings.map(w => `<li>${w}</li>`).join("");
+      warningBox.style.display = "block";
+    }
+
+    // --- Go Back button ---
+    // Uses prevUrl if available (passed from background), otherwise closes/replaces tab
+    document.getElementById("btn-back").addEventListener("click", () => {
+      if (prevUrl) {
+        window.location.href = prevUrl;
+      } else {
+        // No previous page — go to new tab page
+        window.location.href = "about:blank";
+        window.close();
+      }
+    });
+
+    // --- Proceed Anyway button ---
+    document.getElementById("btn-proceed").addEventListener("click", () => {
+      const isHighRisk = ["phishing", "malware", "harmful-app", "download"].includes(reason);
+      if (isHighRisk) {
+        const confirmed = confirm(
+          "⚠️ SERIOUS WARNING\n\nThis site was flagged as dangerous by Google Safe Browsing.\n\nProceeding may expose your passwords, files, or device to attack.\n\nAre you absolutely sure?"
+        );
+        if (!confirmed) return;
+      }
+      // Tell background to allow this URL once, then navigate
+      chrome.runtime.sendMessage({ type: "ALLOW_ONCE", url }, () => {
+        window.location.href = url;
+      });
+    });
+  </script>
+</body>
+</html>

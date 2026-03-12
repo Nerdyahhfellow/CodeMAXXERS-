@@ -1,0 +1,278 @@
+// Shield – Background Service Worker
+
+const PHISHING_PATTERNS = [
+  // Lookalike domains / common phishing signals
+  /paypa1\.com/i,
+  /paypall\./i,
+  /appleid-verify\./i,
+  /apple-id-login\./i,
+  /secure-bankofamerica\./i,
+  /bankofamerica-secure\./i,
+  /amazon-security-alert\./i,
+  /netflix-billing-update\./i,
+  /microsoft-alert\./i,
+  /google-security-alert\./i,
+  /irs-refund\./i,
+  /login-facebook\./i,
+  /facebook-login-secure\./i,
+  /instagram-verify\./i,
+  /wellsfargo-secure\./i,
+  /chase-verify\./i,
+  /account-verify-secure\./i,
+  // Suspicious URL patterns
+  /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/.*login/i,
+  /free-gift-claim\./i,
+  /you-have-won\./i,
+  /prize-claim\./i,
+  /click-here-now\./i,
+];
+
+// Check if URL matches any phishing pattern
+function isPhishingUrl(url) {
+  return PHISHING_PATTERNS.some((pattern) => pattern.test(url));
+}
+
+// --- Google Safe Browsing Integration ---
+// Checks a URL against Google's real-time threat database.
+// Covers: malware, phishing, unwanted software, social engineering.
+const GSB_API_ENDPOINT = "https://safebrowsing.googleapis.com/v4/threatMatches:find";
+
+async function checkGoogleSafeBrowsing(url) {
+  const { safeBrowsingApiKey } = await new Promise((resolve) =>
+    chrome.storage.local.get({ safeBrowsingApiKey: "" }, resolve)
+  );
+
+  if (!safeBrowsingApiKey) return { threat: false, reason: null };
+
+  try {
+    const response = await fetch(`${GSB_API_ENDPOINT}?key=${safeBrowsingApiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client: { clientId: "shield-extension", clientVersion: "1.1.0" },
+        threatInfo: {
+          threatTypes: [
+            "MALWARE",
+            "SOCIAL_ENGINEERING",
+            "UNWANTED_SOFTWARE",
+            "POTENTIALLY_HARMFUL_APPLICATION",
+          ],
+          platformTypes: ["ANY_PLATFORM"],
+          threatEntryTypes: ["URL"],
+          threatEntries: [{ url }],
+        },
+      }),
+    });
+
+    if (!response.ok) return { threat: false, reason: null };
+
+    const data = await response.json();
+
+    if (data.matches && data.matches.length > 0) {
+      const threatType = data.matches[0].threatType;
+      // Map GSB threat type to a friendly reason string
+      const reasonMap = {
+        MALWARE: "malware",
+        SOCIAL_ENGINEERING: "phishing",
+        UNWANTED_SOFTWARE: "unwanted-software",
+        POTENTIALLY_HARMFUL_APPLICATION: "harmful-app",
+      };
+      return { threat: true, reason: reasonMap[threatType] || "malware" };
+    }
+
+    return { threat: false, reason: null };
+  } catch (err) {
+    // Network error or API issue — fail open (don't block)
+    console.warn("[Shield] Safe Browsing API error:", err);
+    return { threat: false, reason: null };
+  }
+}
+
+// Normalize a hostname (strip www.)
+function normalizeHost(input) {
+  try {
+    let val = input.trim().toLowerCase();
+    if (!val.startsWith("http")) val = "https://" + val;
+    const url = new URL(val);
+    return url.hostname.replace(/^www\./, "");
+  } catch {
+    return input.trim().toLowerCase().replace(/^www\./, "");
+  }
+}
+
+// Get stored data
+async function getStorage() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(
+      { blocklist: [], enabled: true },
+      resolve
+    );
+  });
+}
+
+// URLs temporarily allowed by "Proceed Anyway"
+const allowedOnce = new Set();
+
+// Track previous URL per tab for the Go Back button
+const tabPrevUrl = new Map();
+
+// Listen to navigation and block if needed
+chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+  if (details.frameId !== 0) return; // main frame only
+
+  const { blocklist, enabled } = await getStorage();
+  if (!enabled) return;
+
+  const url = details.url;
+
+  // Skip internal/extension pages
+  if (url.startsWith("chrome://") || url.startsWith("chrome-extension://") || url.startsWith("about:")) return;
+
+  // If user chose "Proceed Anyway", allow this one navigation through
+  if (allowedOnce.has(url)) {
+    allowedOnce.delete(url);
+    tabPrevUrl.delete(details.tabId);
+    return;
+  }
+
+  let shouldBlock = false;
+  let reason = "";
+
+  // 1. Check custom blocklist
+  try {
+    const urlObj = new URL(url);
+    const host = urlObj.hostname.replace(/^www\./, "");
+    if (blocklist.some((entry) => host === normalizeHost(entry) || host.endsWith("." + normalizeHost(entry)))) {
+      shouldBlock = true;
+      reason = "blocklist";
+    }
+  } catch {}
+
+  // 2. Check local phishing patterns (instant, no API needed)
+  if (!shouldBlock && isPhishingUrl(url)) {
+    shouldBlock = true;
+    reason = "phishing";
+  }
+
+  // 3. Check Google Safe Browsing (real-time threat intelligence)
+  if (!shouldBlock) {
+    const gsbResult = await checkGoogleSafeBrowsing(url);
+    if (gsbResult.threat) {
+      shouldBlock = true;
+      reason = gsbResult.reason;
+    }
+  }
+
+  if (shouldBlock) {
+    // Increment blocked counter
+    chrome.storage.local.get({ totalBlocked: 0 }, ({ totalBlocked }) => {
+      chrome.storage.local.set({ totalBlocked: totalBlocked + 1 });
+    });
+
+    // Pass previous URL so "Go Back" works
+    const prevUrl = tabPrevUrl.get(details.tabId) || "";
+    const blockPage = chrome.runtime.getURL(
+      `blocked.html?url=${encodeURIComponent(url)}&reason=${reason}&prev=${encodeURIComponent(prevUrl)}`
+    );
+    chrome.tabs.update(details.tabId, { url: blockPage });
+  } else {
+    // Remember this as the last safe page for this tab
+    tabPrevUrl.set(details.tabId, url);
+  }
+});
+
+// Clean up tab history when tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  tabPrevUrl.delete(tabId);
+});
+
+// --- Download Protection ---
+// Intercept downloads and check the source URL against Safe Browsing
+chrome.downloads.onCreated.addListener(async (downloadItem) => {
+  const { enabled } = await getStorage();
+  if (!enabled) return;
+
+  const downloadUrl = downloadItem.url || downloadItem.finalUrl;
+  if (!downloadUrl) return;
+
+  // Check the download URL against GSB
+  const gsbResult = await checkGoogleSafeBrowsing(downloadUrl);
+  if (gsbResult.threat) {
+    // Cancel the download immediately
+    chrome.downloads.cancel(downloadItem.id, () => {
+      chrome.downloads.erase({ id: downloadItem.id });
+    });
+
+    // Increment blocked counter
+    chrome.storage.local.get({ totalBlocked: 0 }, ({ totalBlocked }) => {
+      chrome.storage.local.set({ totalBlocked: totalBlocked + 1 });
+    });
+
+    // Open block page in the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        const blockPage = chrome.runtime.getURL(
+          `blocked.html?url=${encodeURIComponent(downloadUrl)}&reason=download`
+        );
+        chrome.tabs.update(tabs[0].id, { url: blockPage });
+      }
+    });
+  }
+});
+
+// Message handler for popup
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "GET_STATUS") {
+    chrome.storage.local.get(
+      { blocklist: [], enabled: true, safeBrowsingApiKey: "", totalBlocked: 0 },
+      sendResponse
+    );
+    return true;
+  }
+
+  if (msg.type === "SET_ENABLED") {
+    chrome.storage.local.set({ enabled: msg.value }, () => sendResponse({ ok: true }));
+    return true;
+  }
+
+  if (msg.type === "SET_API_KEY") {
+    chrome.storage.local.set({ safeBrowsingApiKey: msg.key }, () => sendResponse({ ok: true }));
+    return true;
+  }
+
+  if (msg.type === "ALLOW_ONCE") {
+    allowedOnce.add(msg.url);
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (msg.type === "ADD_SITE") {
+    getStorage().then(({ blocklist }) => {
+      const host = normalizeHost(msg.site);
+      if (!host || blocklist.includes(host)) {
+        sendResponse({ ok: false, error: "Already exists or invalid" });
+        return;
+      }
+      const updated = [...blocklist, host];
+      chrome.storage.local.set({ blocklist: updated }, () =>
+        sendResponse({ ok: true, blocklist: updated })
+      );
+    });
+    return true;
+  }
+
+  if (msg.type === "REMOVE_SITE") {
+    getStorage().then(({ blocklist }) => {
+      const updated = blocklist.filter((s) => s !== msg.site);
+      chrome.storage.local.set({ blocklist: updated }, () =>
+        sendResponse({ ok: true, blocklist: updated })
+      );
+    });
+    return true;
+  }
+
+  if (msg.type === "CHECK_PHISHING") {
+    sendResponse({ isPhishing: isPhishingUrl(msg.url) });
+    return true;
+  }
+});
