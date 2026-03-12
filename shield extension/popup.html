@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Shield</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { width: 340px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; }
+
+    .header { background: linear-gradient(135deg, #1a1f2e 0%, #16213e 100%); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1e2a3a; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #3b82f6, #6366f1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .logo-text { font-size: 17px; font-weight: 700; color: #f0f4ff; letter-spacing: -0.3px; }
+    .logo-sub { font-size: 10px; color: #64748b; font-weight: 400; margin-top: 1px; }
+    .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+    .toggle-label { font-size: 11px; color: #64748b; }
+    .toggle { position: relative; width: 40px; height: 22px; cursor: pointer; }
+    .toggle input { display: none; }
+    .toggle-track { width: 40px; height: 22px; background: #2d3748; border-radius: 11px; transition: background 0.2s; position: relative; }
+    .toggle input:checked + .toggle-track { background: #3b82f6; }
+    .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
+
+    .stats { display: flex; background: #141824; border-bottom: 1px solid #1e2a3a; }
+    .stat { flex: 1; padding: 10px; text-align: center; border-right: 1px solid #1e2a3a; }
+    .stat:last-child { border-right: none; }
+    .stat-num { font-size: 18px; font-weight: 700; color: #3b82f6; line-height: 1; }
+    .stat-label { font-size: 9px; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
+
+    /* Tabs */
+    .tabs { display: flex; border-bottom: 1px solid #1e2a3a; background: #0d1016; }
+    .tab { flex: 1; padding: 9px 0; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; border: none; background: none; transition: all 0.15s; letter-spacing: 0.3px; }
+    .tab-active { color: #3b82f6; border-bottom: 2px solid #3b82f6; }
+    .tab-inactive { color: #475569; border-bottom: 2px solid transparent; }
+    .tab-inactive:hover { color: #94a3b8; }
+
+    .add-section { padding: 14px 16px 10px; }
+    .add-section label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px; display: block; margin-bottom: 8px; }
+    .add-row { display: flex; gap: 8px; }
+    .add-row input { flex: 1; background: #1e2533; border: 1px solid #2d3748; border-radius: 8px; padding: 8px 12px; color: #e2e8f0; font-size: 13px; outline: none; transition: border-color 0.15s; }
+    .add-row input::placeholder { color: #3d4f63; }
+    .add-row input:focus { border-color: #3b82f6; }
+    .add-row input.error { border-color: #ef4444; }
+    .btn-add { background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: opacity 0.15s; }
+    .btn-add:hover { opacity: 0.85; }
+    .error-msg { font-size: 11px; color: #ef4444; margin-top: 5px; min-height: 14px; }
+
+    .divider { height: 1px; background: #1e2a3a; margin: 4px 0; }
+
+    .list-section { padding: 10px 16px 14px; }
+    .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .list-header span { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px; }
+    .list-count { background: #1e2533; color: #3b82f6; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+    .white-count { background: #1e2533; color: #22c55e; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+
+    .blocklist, .whitelist-list { max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+    .blocklist::-webkit-scrollbar, .whitelist-list::-webkit-scrollbar { width: 4px; }
+    .blocklist::-webkit-scrollbar-thumb, .whitelist-list::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 2px; }
+
+    .site-item { display: flex; align-items: center; justify-content: space-between; background: #1a2030; border: 1px solid #212a3a; border-radius: 7px; padding: 7px 10px; animation: fadeIn 0.15s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .site-info { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .site-dot { width: 6px; height: 6px; background: #ef4444; border-radius: 50%; flex-shrink: 0; }
+    .dot-green { background: #22c55e !important; }
+    .site-name { font-size: 12px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+    .btn-remove { background: none; border: none; color: #374151; cursor: pointer; font-size: 16px; padding: 0 2px; line-height: 1; transition: color 0.15s; flex-shrink: 0; }
+    .btn-remove:hover { color: #ef4444; }
+    .empty-state { text-align: center; padding: 20px; color: #374151; font-size: 12px; }
+    .empty-icon { font-size: 24px; margin-bottom: 6px; }
+
+    .footer { padding: 8px 16px; background: #0d1016; border-top: 1px solid #1a1f2e; display: flex; align-items: center; justify-content: space-between; }
+    .phishing-badge { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #22c55e; }
+    .phishing-dot { width: 5px; height: 5px; background: #22c55e; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .footer-right { font-size: 10px; color: #1e2a3a; }
+
+    .disabled-overlay { position: absolute; inset: 0; background: rgba(15,17,23,0.6); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #475569; pointer-events: none; z-index: 10; }
+    .main-content { position: relative; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🛡️</div>
+      <div>
+        <div class="logo-text">Shield</div>
+        <div class="logo-sub">Site Blocker & Phishing Protection</div>
+      </div>
+    </div>
+    <div class="toggle-wrap">
+      <span class="toggle-label" id="toggle-status">ON</span>
+      <label class="toggle">
+        <input type="checkbox" id="enabled-toggle" checked />
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="main-content" id="main-content">
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num" id="stat-blocked">0</div>
+        <div class="stat-label">Threats Blocked</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" style="color:#22c55e">✓ On</div>
+        <div class="stat-label">Live Scan</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="stat-count">0</div>
+        <div class="stat-label">In Blocklist</div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab tab-active" id="tab-blocklist">🚫 Blocklist</button>
+      <button class="tab tab-inactive" id="tab-whitelist">✅ Whitelist</button>
+    </div>
+
+    <div class="add-section">
+      <label id="input-label">ADD SITE TO BLOCK</label>
+      <div class="add-row">
+        <input type="text" id="site-input" placeholder="e.g. example.com" autocomplete="off" />
+        <button class="btn-add" id="btn-add">Block</button>
+      </div>
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="blocklist-section" class="list-section">
+      <div class="list-header">
+        <span>Blocked Sites</span>
+        <span class="list-count" id="list-count">0</span>
+      </div>
+      <div class="blocklist" id="blocklist"></div>
+    </div>
+
+    <div id="whitelist-section" class="list-section" style="display:none">
+      <div class="list-header">
+        <span>Allowed Sites</span>
+        <span class="white-count" id="white-count">0</span>
+      </div>
+      <div class="whitelist-list" id="whitelist"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="phishing-badge">
+      <div class="phishing-dot"></div>
+      Phishing protection active
+    </div>
+    <div class="footer-right">v1.2</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
