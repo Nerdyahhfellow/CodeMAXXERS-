@@ -359,67 +359,33 @@
 
     .main-content { position: relative; }
 
-    /* API Key section */
-    .api-section {
-      padding: 10px 16px;
+
+    /* Tabs */
+    .tabs {
+      display: flex;
       border-bottom: 1px solid #1e2a3a;
+      background: #0d1016;
     }
-    .api-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 6px;
-    }
-    .api-label {
-      font-size: 11px;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-    }
-    .api-status {
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-weight: 600;
-    }
-    .api-status.active { background: #14532d; color: #22c55e; }
-    .api-status.inactive { background: #3b1f00; color: #f59e0b; }
-    .api-row {
-      display: flex;
-      gap: 6px;
-    }
-    .api-row input {
+    .tab {
       flex: 1;
-      background: #1e2533;
-      border: 1px solid #2d3748;
-      border-radius: 8px;
-      padding: 7px 10px;
-      color: #e2e8f0;
-      font-size: 12px;
-      outline: none;
-      font-family: monospace;
-      transition: border-color 0.15s;
-    }
-    .api-row input:focus { border-color: #3b82f6; }
-    .api-row input::placeholder { color: #3d4f63; }
-    .btn-save-key {
-      background: #1e3a5f;
-      color: #60a5fa;
-      border: 1px solid #2d4f7a;
-      border-radius: 8px;
-      padding: 7px 12px;
+      padding: 9px 0;
       font-size: 12px;
       font-weight: 600;
+      text-align: center;
       cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.15s;
-    }
-    .btn-save-key:hover { background: #1e4a7a; }
-    .api-hint {
-      font-size: 10px;
       color: #475569;
-      margin-top: 5px;
-      line-height: 1.4;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+    .tab:hover { color: #94a3b8; }
+    .tab.active { color: #e2e8f0; border-bottom-color: #3b82f6; }
+    .tab-block.active { border-bottom-color: #ef4444; color: #ef4444; }
+    .tab-allow.active { border-bottom-color: #22c55e; color: #22c55e; }
+
+    /* Allow button variant */
+    .btn-add-allow {
+      background: linear-gradient(135deg, #16a34a, #15803d) !important;
     }
   </style>
 </head>
@@ -449,7 +415,7 @@
         <div class="stat-label">Threats Blocked</div>
       </div>
       <div class="stat">
-        <div class="stat-num" id="stat-gsb" style="color:#f59e0b">⚠ Off</div>
+        <div class="stat-num" id="stat-gsb" style="color:#22c55e">✓ On</div>
         <div class="stat-label">Live Scan</div>
       </div>
       <div class="stat">
@@ -458,38 +424,44 @@
       </div>
     </div>
 
-    <!-- Google Safe Browsing API Key Setup -->
-    <div class="api-section">
-      <div class="api-header">
-        <span class="api-label">🔍 Google Safe Browsing</span>
-        <span class="api-status inactive" id="api-status">Not configured</span>
-      </div>
-      <div class="api-row">
-        <input type="password" id="api-key-input" placeholder="Paste your API key here…" autocomplete="off" />
-        <button class="btn-save-key" id="btn-save-key">Save</button>
-      </div>
-      <div class="api-hint">
-        Free key from <strong>console.cloud.google.com</strong> → Enable "Safe Browsing API" → Credentials → Create API Key
-      </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab tab-block active" id="tab-block">🚫 Blocked Sites</div>
+      <div class="tab tab-allow" id="tab-allow">✅ Whitelisted Sites</div>
     </div>
 
     <div class="add-section">
-      <label>Add website to block</label>
+      <label id="add-label">Add website to block</label>
       <div class="add-row">
         <input type="text" id="site-input" placeholder="e.g. example.com" autocomplete="off" />
-        <button class="btn-add" id="btn-add">Block</button>
+        <button class="btn-add btn-add-block" id="btn-add">Block</button>
       </div>
       <div class="error-msg" id="error-msg"></div>
     </div>
 
     <div class="divider"></div>
 
-    <div class="list-section">
-      <div class="list-header">
-        <span>Blocked Sites</span>
-        <span class="list-count" id="list-count">0</span>
+    <!-- Block panel -->
+    <div id="panel-block">
+      <div class="list-section">
+        <div class="list-header">
+          <span>Blocked Sites</span>
+          <span class="list-count" id="list-count">0</span>
+        </div>
+        <div class="blocklist" id="blocklist"></div>
       </div>
-      <div class="blocklist" id="blocklist"></div>
+    </div>
+
+    <!-- Allow panel -->
+    <div id="panel-allow" style="display:none">
+      <div class="list-section">
+        <div class="list-header">
+          <span>Whitelisted Sites</span>
+          <span class="list-count" id="wlist-count">0</span>
+        </div>
+        <div class="blocklist" id="whitelist"></div>
+      </div>
     </div>
   </div>
 

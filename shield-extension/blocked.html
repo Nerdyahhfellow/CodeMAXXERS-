@@ -5,7 +5,6 @@
   <title>Blocked by Shield</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       min-height: 100vh;
       background: #0a0d14;
@@ -14,290 +13,279 @@
       justify-content: center;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       color: #e2e8f0;
+      padding: 24px 16px;
     }
-
-    .container {
-      max-width: 520px;
-      width: 90%;
-      text-align: center;
-    }
-
-    .shield-icon {
-      font-size: 72px;
-      margin-bottom: 20px;
-      filter: drop-shadow(0 0 30px rgba(239, 68, 68, 0.4));
-      animation: float 3s ease-in-out infinite;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-8px); }
-    }
-
+    .container { max-width: 560px; width: 100%; }
+    .top { text-align: center; margin-bottom: 24px; }
+    .threat-icon { font-size: 64px; display: block; margin-bottom: 14px; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
     .badge {
-      display: inline-block;
-      padding: 4px 14px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 16px;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 16px; border-radius: 20px; font-size: 12px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px;
     }
-
-    .badge.phishing, .badge.malware, .badge.harmful-app, .badge.download {
-      background: rgba(239,68,68,0.15);
-      color: #ef4444;
-      border: 1px solid rgba(239,68,68,0.3);
-    }
-
-    .badge.unwanted-software {
-      background: rgba(245,158,11,0.15);
-      color: #f59e0b;
-      border: 1px solid rgba(245,158,11,0.3);
-    }
-
-    .badge.blocklist {
-      background: rgba(245,158,11,0.15);
-      color: #f59e0b;
-      border: 1px solid rgba(245,158,11,0.3);
-    }
-
-    h1 {
-      font-size: 32px;
-      font-weight: 800;
-      margin-bottom: 10px;
-      letter-spacing: -0.5px;
-    }
-
-    .subtitle {
-      font-size: 15px;
-      color: #64748b;
-      margin-bottom: 28px;
-      line-height: 1.5;
-    }
-
-    .url-box {
-      background: #111827;
-      border: 1px solid #1e2a3a;
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 13px;
-      color: #94a3b8;
-      margin-bottom: 28px;
-      word-break: break-all;
-      text-align: left;
-    }
-
-    .url-label {
-      font-size: 10px;
-      color: #374151;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-    }
-
-    .actions {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      padding: 10px 22px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: opacity 0.15s;
-    }
-
-    .btn:hover { opacity: 0.85; }
-
-    .btn-back {
-      background: linear-gradient(135deg, #3b82f6, #6366f1);
-      color: white;
-    }
-
-    .btn-proceed {
-      background: #1e2533;
-      color: #64748b;
-      border: 1px solid #2d3748;
-    }
-
-    .powered {
-      margin-top: 32px;
-      font-size: 11px;
-      color: #1e2a3a;
-    }
-
-    .warning-list {
-      background: rgba(239,68,68,0.05);
-      border: 1px solid rgba(239,68,68,0.15);
-      border-radius: 10px;
-      padding: 14px 18px;
-      margin-bottom: 24px;
-      text-align: left;
-    }
-
-    .warning-list h3 {
-      font-size: 12px;
-      color: #ef4444;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      margin-bottom: 8px;
-    }
-
-    .warning-list li {
-      font-size: 12px;
-      color: #64748b;
-      margin-left: 16px;
-      margin-bottom: 4px;
-      line-height: 1.4;
-    }
+    .badge-dot { width:7px;height:7px;border-radius:50%;animation:blink 1.2s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .badge.red   { background:rgba(239,68,68,0.15);  color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
+    .badge.red   .badge-dot { background:#ef4444; }
+    .badge.amber { background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); }
+    .badge.amber .badge-dot { background:#f59e0b; }
+    .badge.gray  { background:rgba(100,116,139,0.15);color:#94a3b8; border:1px solid rgba(100,116,139,0.3); }
+    .badge.gray  .badge-dot { background:#94a3b8; }
+    h1 { font-size:28px;font-weight:800;margin-bottom:8px;letter-spacing:-0.4px; }
+    .subtitle { font-size:14px;color:#64748b;line-height:1.55; }
+    .threat-card { border-radius:14px;padding:18px 20px;margin:20px 0;border:1px solid; }
+    .threat-card.red   { background:rgba(239,68,68,0.06);  border-color:rgba(239,68,68,0.2); }
+    .threat-card.amber { background:rgba(245,158,11,0.06); border-color:rgba(245,158,11,0.2); }
+    .threat-card.gray  { background:rgba(100,116,139,0.06);border-color:rgba(100,116,139,0.2); }
+    .card-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px; }
+    .threat-card.red   .card-title { color:#ef4444; }
+    .threat-card.amber .card-title { color:#f59e0b; }
+    .threat-card.gray  .card-title { color:#94a3b8; }
+    .threat-what { font-size:13.5px;color:#cbd5e1;line-height:1.6;margin-bottom:14px; }
+    .risk-row { display:flex;align-items:flex-start;gap:10px;font-size:13px;color:#94a3b8;line-height:1.45;margin-bottom:6px; }
+    .risk-icon { font-size:15px;flex-shrink:0;margin-top:1px; }
+    .url-box { background:#0d1017;border:1px solid #1e2a3a;border-radius:10px;padding:11px 14px;margin-bottom:20px; }
+    .url-box-label { font-size:10px;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px; }
+    .url-text { font-size:12px;color:#94a3b8;word-break:break-all;line-height:1.4; }
+    .advice { background:#0d1827;border:1px solid #1a3a5c;border-radius:10px;padding:13px 16px;margin-bottom:16px; }
+    .advice-title { font-size:11px;color:#3b82f6;text-transform:uppercase;letter-spacing:0.7px;font-weight:700;margin-bottom:8px; }
+    .advice-item { font-size:12.5px;color:#64748b;display:flex;gap:8px;line-height:1.4;margin-bottom:5px; }
+    .advice-item::before { content:"→";color:#3b82f6;flex-shrink:0;font-weight:700; }
+    .source-row { text-align:center;font-size:11px;color:#374151;margin-bottom:20px; }
+    .actions { display:flex;gap:10px; }
+    .btn { padding:12px 0;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:opacity 0.15s,transform 0.1s;flex:1;text-align:center; }
+    .btn:hover { opacity:0.85; }
+    .btn:active { transform:scale(0.97); }
+    .btn-back { background:linear-gradient(135deg,#3b82f6,#6366f1);color:white; }
+    .btn-proceed { background:#131820;color:#64748b;border:1px solid #1e2a3a;font-size:12px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="shield-icon">🛡️</div>
-    <div class="badge" id="reason-badge">Blocked</div>
-    <h1 id="title">Site Blocked</h1>
-    <p class="subtitle" id="subtitle">Shield has blocked this site to protect you.</p>
+    <div class="top">
+      <span class="threat-icon" id="threat-icon">🛡️</span>
+      <div><span class="badge gray" id="reason-badge"><span class="badge-dot"></span><span id="badge-text">Blocked</span></span></div>
+      <h1 id="title">Site Blocked</h1>
+      <p class="subtitle" id="subtitle">Shield has blocked this site.</p>
+    </div>
+
+    <div class="threat-card gray" id="threat-card">
+      <div class="card-title" id="card-title">THREAT DETAILS</div>
+      <p class="threat-what" id="threat-what"></p>
+      <div id="threat-risks"></div>
+    </div>
 
     <div class="url-box">
-      <div class="url-label" id="url-label">Blocked URL</div>
-      <div id="blocked-url">—</div>
+      <div class="url-box-label" id="url-label">Blocked URL</div>
+      <div class="url-text" id="blocked-url">Loading...</div>
     </div>
 
-    <div class="warning-list" id="warning-box" style="display:none">
-      <h3 id="warning-title">⚠️ Why this may be dangerous</h3>
-      <ul id="warning-items"></ul>
+    <div class="advice">
+      <div class="advice-title">💡 What you should do</div>
+      <div id="advice-items"></div>
     </div>
+
+    <div class="source-row" id="source-row"></div>
 
     <div class="actions">
-      <button class="btn btn-back" id="btn-back">← Go Back</button>
-      <button class="btn btn-proceed" id="btn-proceed">Proceed Anyway</button>
+      <button class="btn btn-back" id="btn-back">← Go Back (Safe)</button>
+      <button class="btn btn-proceed" id="btn-proceed">Proceed at own risk</button>
     </div>
-
-    <div class="powered">Protected by Shield v1.1</div>
   </div>
 
-  <script>
-    const params = new URLSearchParams(location.search);
-    const reason = params.get("reason") || "blocklist";
-    const url = params.get("url") ? decodeURIComponent(params.get("url")) : "Unknown URL";
-    const tabId = params.get("tabId") ? parseInt(params.get("tabId")) : null;
-    const prevUrl = params.get("prev") ? decodeURIComponent(params.get("prev")) : null;
+<script>
+(function() {
+  // Parse URL params
+  var params  = new URLSearchParams(window.location.search);
+  var reason  = params.get("reason") || "blocklist";
+  var blocked = params.get("url")  ? decodeURIComponent(params.get("url"))  : "";
+  var prevUrl = params.get("prev") ? decodeURIComponent(params.get("prev")) : "";
 
-    document.getElementById("blocked-url").textContent = url;
+  // Populate URL box right away — no waiting needed
+  document.getElementById("blocked-url").textContent = blocked || "Unknown URL";
 
-    const badge   = document.getElementById("reason-badge");
-    const title   = document.getElementById("title");
-    const subtitle = document.getElementById("subtitle");
-    const warningBox = document.getElementById("warning-box");
-    const warningItems = document.getElementById("warning-items");
-    const urlLabel = document.getElementById("url-label");
-
-    const configs = {
-      phishing: {
-        badge: "⚠️ Phishing Detected", badgeClass: "badge phishing",
-        title: "Dangerous Site Blocked",
-        subtitle: "This site has been flagged as a phishing attempt designed to steal your information.",
-        warnings: [
-          "Flagged by Google Safe Browsing as phishing",
-          "May be impersonating a trusted website",
-          "Could steal your login credentials or personal data"
-        ]
-      },
-      malware: {
-        badge: "☣️ Malware Detected", badgeClass: "badge malware",
-        title: "Malware Site Blocked",
-        subtitle: "This site is known to distribute malware that could infect your device.",
-        warnings: [
-          "Flagged by Google Safe Browsing as a malware source",
-          "May silently install harmful software on your device",
-          "Could compromise your files, passwords, or camera"
-        ]
-      },
-      "unwanted-software": {
-        badge: "⚠️ Unwanted Software", badgeClass: "badge unwanted-software",
-        title: "Suspicious Site Blocked",
-        subtitle: "This site is associated with unwanted or deceptive software.",
-        warnings: [
-          "May bundle unwanted software with downloads",
-          "Could change browser settings without permission",
-          "Flagged by Google Safe Browsing"
-        ]
-      },
-      "harmful-app": {
-        badge: "☣️ Harmful App", badgeClass: "badge harmful-app",
-        title: "Harmful Download Blocked",
-        subtitle: "This site hosts applications that may harm your device.",
-        warnings: [
-          "Flagged by Google Safe Browsing as harmful",
-          "Application may contain spyware or ransomware",
-          "Do not download or install anything from this site"
-        ]
-      },
-      download: {
-        badge: "⛔ Dangerous Download", badgeClass: "badge download",
-        title: "Download Blocked",
-        subtitle: "This file has been flagged as malicious by Google Safe Browsing.",
-        warnings: [
-          "File URL matches known malware signatures",
-          "Downloading this file could infect your device",
-          "The source site is flagged as dangerous"
-        ],
-        urlLabel: "Blocked Download URL"
-      },
-      blocklist: {
-        badge: "Blocked Site", badgeClass: "badge blocklist",
-        title: "Site Blocked",
-        subtitle: "This website is on your blocklist. Shield prevented you from visiting it.",
-        warnings: []
-      }
-    };
-
-    const cfg = configs[reason] || configs.blocklist;
-    badge.textContent = cfg.badge;
-    badge.className = cfg.badgeClass;
-    title.textContent = cfg.title;
-    subtitle.textContent = cfg.subtitle;
-    if (cfg.urlLabel) urlLabel.textContent = cfg.urlLabel;
-
-    if (cfg.warnings && cfg.warnings.length > 0) {
-      warningItems.innerHTML = cfg.warnings.map(w => `<li>${w}</li>`).join("");
-      warningBox.style.display = "block";
+  var configs = {
+    phishing: {
+      icon: "🎣", color: "red", badge: "Phishing Attack",
+      title: "This site is trying to steal your info",
+      subtitle: "It's disguised as a real website to trick you into handing over your passwords, credit card, or personal details.",
+      cardTitle: "WHAT IS PHISHING?",
+      what: "Phishing sites are fake pages that look identical to real ones — like your bank, Google, or PayPal. The goal is to get you to type in your login or payment details, which the attackers then steal.",
+      risks: [
+        { icon: "🔑", text: "Your passwords and login credentials could be stolen" },
+        { icon: "💳", text: "Credit card or banking details could be harvested" },
+        { icon: "👤", text: "Your identity could be used to open accounts or take out loans" },
+        { icon: "📧", text: "Your email could be hijacked to attack your contacts" }
+      ],
+      advice: [
+        "Do not enter any login details or personal info on this site",
+        "If you were already on it, change your passwords immediately",
+        "Verify the real site by typing its URL manually in a new tab",
+        "Contact your bank if it was impersonating a financial service"
+      ],
+      source: "Detected by Google Safe Browsing — Social Engineering / Phishing",
+      urlLabel: "Phishing URL"
+    },
+    malware: {
+      icon: "☣️", color: "red", badge: "Malware Threat",
+      title: "This site distributes viruses",
+      subtitle: "Visiting or downloading from this site could silently infect your device with malicious software.",
+      cardTitle: "WHAT IS MALWARE?",
+      what: "Malware is malicious software — viruses, trojans, ransomware, spyware. This site is known to install it on visitors' devices, often without you clicking anything. It runs silently in the background.",
+      risks: [
+        { icon: "🔒", text: "Ransomware could encrypt your files and demand payment to unlock them" },
+        { icon: "👁️", text: "Spyware could monitor everything you type, including passwords" },
+        { icon: "💻", text: "Your device could be secretly recruited into a botnet" },
+        { icon: "📁", text: "Personal files, photos and documents could be stolen or deleted" }
+      ],
+      advice: [
+        "Do not visit this site or download anything from it",
+        "If you already visited it, run a full antivirus scan immediately",
+        "Check your browser extensions for anything you didn't install",
+        "Change passwords for important accounts as a precaution"
+      ],
+      source: "Detected by Google Safe Browsing — Malware",
+      urlLabel: "Malware Site URL"
+    },
+    "unwanted-software": {
+      icon: "⚠️", color: "amber", badge: "Unwanted Software",
+      title: "This site pushes deceptive software",
+      subtitle: "This site tricks you into installing software that does things you never agreed to.",
+      cardTitle: "WHAT IS UNWANTED SOFTWARE?",
+      what: "Unwanted software (adware/PUPs) disguises itself as something useful — a free tool, video player, or browser extension. Once installed it hijacks your browser, injects ads, tracks your activity, or installs more junk.",
+      risks: [
+        { icon: "🌐", text: "Your browser homepage and search engine could be changed without permission" },
+        { icon: "📢", text: "Intrusive ads could be injected into every website you visit" },
+        { icon: "📊", text: "Your browsing habits could be tracked and sold to advertisers" },
+        { icon: "🔧", text: "It may be very hard to uninstall and could reinstall itself automatically" }
+      ],
+      advice: [
+        "Do not download or install anything from this site",
+        "If you already installed something, remove it via your system's app manager",
+        "Check your browser extensions and remove anything unfamiliar",
+        "Reset your browser settings if your homepage or search engine changed"
+      ],
+      source: "Detected by Google Safe Browsing — Unwanted Software",
+      urlLabel: "Suspicious URL"
+    },
+    "harmful-app": {
+      icon: "💀", color: "red", badge: "Harmful Application",
+      title: "This download can damage your device",
+      subtitle: "This site hosts an app flagged as harmful — it likely contains spyware, ransomware, or a trojan.",
+      cardTitle: "WHAT IS A HARMFUL APP?",
+      what: "Harmful apps look useful but secretly perform malicious actions — recording your screen, stealing files, locking your device for ransom, or giving attackers full remote access to your computer.",
+      risks: [
+        { icon: "🎥", text: "Could secretly activate your webcam or microphone" },
+        { icon: "🔑", text: "Keyloggers may record every keystroke including passwords" },
+        { icon: "🏦", text: "Banking trojans can intercept and redirect your transactions" },
+        { icon: "🔒", text: "Ransomware can permanently lock all your files" }
+      ],
+      advice: [
+        "Do not download or run any file from this site",
+        "If you already ran it, disconnect from the internet and run antivirus",
+        "In severe cases, a full OS reinstall may be necessary",
+        "Report it to IT support if this happened on a work device"
+      ],
+      source: "Detected by Google Safe Browsing — Potentially Harmful Application",
+      urlLabel: "Harmful App URL"
+    },
+    download: {
+      icon: "⛔", color: "red", badge: "Dangerous Download Blocked",
+      title: "This file was flagged as malicious",
+      subtitle: "Shield cancelled this download before it reached your device. The file is known to contain malware.",
+      cardTitle: "WHAT WAS IN THIS FILE?",
+      what: "The download URL matched Google Safe Browsing's database of known malicious files. These are typically trojans, ransomware, or spyware bundled inside something that looks harmless — a PDF, installer, zip, or document.",
+      risks: [
+        { icon: "🔒", text: "Could encrypt all your files and demand a ransom to unlock them" },
+        { icon: "👁️", text: "Could silently spy on your activity and steal credentials" },
+        { icon: "💻", text: "Could give an attacker full remote access to your device" },
+        { icon: "📁", text: "Could delete or secretly upload your sensitive files" }
+      ],
+      advice: [
+        "The download was cancelled — your device is safe this time",
+        "Do not try to re-download this file from any source",
+        "If you got the link via email or message, treat the sender as compromised",
+        "If you downloaded it before Shield was installed, run a virus scan now"
+      ],
+      source: "Detected by Google Safe Browsing — Malicious Download",
+      urlLabel: "Download URL"
+    },
+    blocklist: {
+      icon: "🚫", color: "gray", badge: "Manually Blocked",
+      title: "You've blocked this site",
+      subtitle: "This website is on your personal blocklist. Shield stopped you from visiting it.",
+      cardTitle: "WHY IS THIS BLOCKED?",
+      what: "You manually added this site to Shield's blocklist. No automatic threat was detected — this is a block you set yourself. You can remove it from the Shield popup, or click 'Proceed at own risk' below to visit it just this once.",
+      risks: [],
+      advice: [
+        "To unblock it permanently, open the Shield popup and remove it from your blocklist",
+        "Or click 'Proceed at own risk' below to visit it this one time"
+      ],
+      source: "Blocked by your personal Shield blocklist",
+      urlLabel: "Blocked URL"
     }
+  };
 
-    // --- Go Back button ---
-    // Uses prevUrl if available (passed from background), otherwise closes/replaces tab
-    document.getElementById("btn-back").addEventListener("click", () => {
-      if (prevUrl) {
-        window.location.href = prevUrl;
-      } else {
-        // No previous page — go to new tab page
-        window.location.href = "about:blank";
-        window.close();
-      }
-    });
+  var cfg = configs[reason] || configs.blocklist;
 
-    // --- Proceed Anyway button ---
-    document.getElementById("btn-proceed").addEventListener("click", () => {
-      const isHighRisk = ["phishing", "malware", "harmful-app", "download"].includes(reason);
-      if (isHighRisk) {
-        const confirmed = confirm(
-          "⚠️ SERIOUS WARNING\n\nThis site was flagged as dangerous by Google Safe Browsing.\n\nProceeding may expose your passwords, files, or device to attack.\n\nAre you absolutely sure?"
-        );
-        if (!confirmed) return;
-      }
-      // Tell background to allow this URL once, then navigate
-      chrome.runtime.sendMessage({ type: "ALLOW_ONCE", url }, () => {
-        window.location.href = url;
-      });
-    });
-  </script>
+  // Populate all elements
+  document.getElementById("threat-icon").textContent     = cfg.icon;
+  document.getElementById("reason-badge").className      = "badge " + cfg.color;
+  document.getElementById("badge-text").textContent      = cfg.badge;
+  document.getElementById("title").textContent           = cfg.title;
+  document.getElementById("subtitle").textContent        = cfg.subtitle;
+  document.getElementById("threat-card").className       = "threat-card " + cfg.color;
+  document.getElementById("card-title").textContent      = cfg.cardTitle;
+  document.getElementById("threat-what").textContent     = cfg.what;
+  document.getElementById("url-label").textContent       = cfg.urlLabel;
+  document.getElementById("source-row").textContent      = cfg.source;
+
+  // Risks list
+  var risksHTML = "";
+  for (var i = 0; i < cfg.risks.length; i++) {
+    risksHTML += '<div class="risk-row"><span class="risk-icon">' + cfg.risks[i].icon + '</span><span>' + cfg.risks[i].text + '</span></div>';
+  }
+  document.getElementById("threat-risks").innerHTML = risksHTML;
+
+  // Advice list
+  var adviceHTML = "";
+  for (var j = 0; j < cfg.advice.length; j++) {
+    adviceHTML += '<div class="advice-item">' + cfg.advice[j] + '</div>';
+  }
+  document.getElementById("advice-items").innerHTML = adviceHTML;
+
+  // ---- GO BACK BUTTON ----
+  // Zero chrome API dependency — just navigate to prevUrl directly
+  document.getElementById("btn-back").onclick = function() {
+    if (prevUrl && prevUrl.indexOf("http") === 0) {
+      window.location.href = prevUrl;
+    } else {
+      // No safe prev page — go to Opera's default new tab
+      window.location.href = "about:newtab";
+    }
+  };
+
+  // ---- PROCEED BUTTON ----
+  // Zero chrome API dependency — appends __shield_allow=1 to URL
+  // background.js detects this param and skips all checks for that navigation
+  document.getElementById("btn-proceed").onclick = function() {
+    if (reason !== "blocklist") {
+      var ok = window.confirm(
+        "WARNING: " + cfg.badge + "\n\n" +
+        "Google Safe Browsing flagged this site as dangerous.\n\n" +
+        "Proceeding may expose your device and personal data to serious risk.\n\n" +
+        "Are you absolutely sure you want to continue?"
+      );
+      if (!ok) return;
+    }
+    if (!blocked) return;
+    // Append the allow flag — background.js will let this through
+    var separator = blocked.indexOf("?") >= 0 ? "&" : "?";
+    window.location.href = blocked + separator + "__shield_allow=1";
+  };
+
+})();
+</script>
 </body>
 </html>

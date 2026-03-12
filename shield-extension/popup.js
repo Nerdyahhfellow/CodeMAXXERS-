@@ -1,78 +1,62 @@
 // Shield – Popup Script
 
 let blocklist = [];
+let whitelist = [];
 let enabled = true;
+let activeTab = "block"; // "block" or "allow"
 
-const blocklistEl = document.getElementById("blocklist");
-const listCountEl = document.getElementById("list-count");
-const statBlockedEl = document.getElementById("stat-blocked");
-const statGsbEl = document.getElementById("stat-gsb");
-const statCountEl = document.getElementById("stat-count");
-const siteInput = document.getElementById("site-input");
-const errorMsg = document.getElementById("error-msg");
-const btnAdd = document.getElementById("btn-add");
-const enabledToggle = document.getElementById("enabled-toggle");
-const toggleStatus = document.getElementById("toggle-status");
-const mainContent = document.getElementById("main-content");
-const apiKeyInput = document.getElementById("api-key-input");
-const btnSaveKey = document.getElementById("btn-save-key");
-const apiStatus = document.getElementById("api-status");
+const blocklistEl    = document.getElementById("blocklist");
+const whitelistEl    = document.getElementById("whitelist");
+const listCountEl    = document.getElementById("list-count");
+const wlistCountEl   = document.getElementById("wlist-count");
+const statBlockedEl  = document.getElementById("stat-blocked");
+const statCountEl    = document.getElementById("stat-count");
+const siteInput      = document.getElementById("site-input");
+const errorMsg       = document.getElementById("error-msg");
+const btnAdd         = document.getElementById("btn-add");
+const enabledToggle  = document.getElementById("enabled-toggle");
+const toggleStatus   = document.getElementById("toggle-status");
+const mainContent    = document.getElementById("main-content");
+const tabBlock       = document.getElementById("tab-block");
+const tabAllow       = document.getElementById("tab-allow");
+const panelBlock     = document.getElementById("panel-block");
+const panelAllow     = document.getElementById("panel-allow");
 
 // Load initial state
 chrome.runtime.sendMessage({ type: "GET_STATUS" }, (res) => {
   if (!res) return;
   blocklist = res.blocklist || [];
+  whitelist = res.whitelist || [];
   enabled = res.enabled !== false;
   enabledToggle.checked = enabled;
   toggleStatus.textContent = enabled ? "ON" : "OFF";
-
-  // Show API key status
-  if (res.safeBrowsingApiKey) {
-    apiKeyInput.value = res.safeBrowsingApiKey;
-    setApiStatus(true);
-  } else {
-    setApiStatus(false);
-  }
-
   statBlockedEl.textContent = res.totalBlocked || 0;
-  renderList();
+  renderBlocklist();
+  renderWhitelist();
   updateStats();
 });
 
-// API key status badge
-function setApiStatus(active) {
-  if (active) {
-    apiStatus.textContent = "✓ Active";
-    apiStatus.className = "api-status active";
-    statGsbEl.textContent = "✓ On";
-    statGsbEl.style.color = "#22c55e";
-  } else {
-    apiStatus.textContent = "Not configured";
-    apiStatus.className = "api-status inactive";
-    statGsbEl.textContent = "⚠ Off";
-    statGsbEl.style.color = "#f59e0b";
-  }
-}
+// Tab switching
+tabBlock.addEventListener("click", () => switchTab("block"));
+tabAllow.addEventListener("click", () => switchTab("allow"));
 
-// Save API key
-btnSaveKey.addEventListener("click", () => {
-  const key = apiKeyInput.value.trim();
-  chrome.runtime.sendMessage({ type: "SET_API_KEY", key }, (res) => {
-    if (res && res.ok) {
-      setApiStatus(!!key);
-      btnSaveKey.textContent = "✓";
-      btnSaveKey.style.color = "#22c55e";
-      setTimeout(() => { btnSaveKey.textContent = "Save"; btnSaveKey.style.color = ""; }, 1500);
-    }
-  });
-});
+function switchTab(tab) {
+  activeTab = tab;
+  tabBlock.classList.toggle("active", tab === "block");
+  tabAllow.classList.toggle("active", tab === "allow");
+  panelBlock.style.display = tab === "block" ? "block" : "none";
+  panelAllow.style.display = tab === "allow" ? "block" : "none";
+  siteInput.placeholder = tab === "block" ? "e.g. example.com" : "e.g. mybank.com";
+  btnAdd.textContent = tab === "block" ? "Block" : "Allow";
+  btnAdd.className = tab === "block" ? "btn-add btn-add-block" : "btn-add btn-add-allow";
+  errorMsg.textContent = "";
+}
 
 // Toggle enabled
 enabledToggle.addEventListener("change", () => {
   enabled = enabledToggle.checked;
   toggleStatus.textContent = enabled ? "ON" : "OFF";
   chrome.runtime.sendMessage({ type: "SET_ENABLED", value: enabled });
-
   const overlay = document.getElementById("disabled-overlay");
   if (!enabled) {
     if (!overlay) {
@@ -87,22 +71,24 @@ enabledToggle.addEventListener("change", () => {
   }
 });
 
-// Add site
+// Add site (block or whitelist depending on active tab)
 function addSite() {
   const val = siteInput.value.trim();
   errorMsg.textContent = "";
   siteInput.classList.remove("error");
+  if (!val) { showError("Please enter a website."); return; }
 
-  if (!val) {
-    showError("Please enter a website.");
-    return;
-  }
-
-  chrome.runtime.sendMessage({ type: "ADD_SITE", site: val }, (res) => {
+  const msgType = activeTab === "block" ? "ADD_SITE" : "ADD_WHITELIST";
+  chrome.runtime.sendMessage({ type: msgType, site: val }, (res) => {
     if (res && res.ok) {
-      blocklist = res.blocklist;
+      if (activeTab === "block") {
+        blocklist = res.blocklist;
+        renderBlocklist();
+      } else {
+        whitelist = res.whitelist;
+        renderWhitelist();
+      }
       siteInput.value = "";
-      renderList();
       updateStats();
     } else {
       showError(res?.error || "Could not add site.");
@@ -111,59 +97,60 @@ function addSite() {
 }
 
 btnAdd.addEventListener("click", addSite);
-siteInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") addSite();
-});
+siteInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addSite(); });
 
 function showError(msg) {
   errorMsg.textContent = msg;
   siteInput.classList.add("error");
-  setTimeout(() => {
-    errorMsg.textContent = "";
-    siteInput.classList.remove("error");
-  }, 2500);
+  setTimeout(() => { errorMsg.textContent = ""; siteInput.classList.remove("error"); }, 2500);
 }
 
-// Remove site
+// Remove from blocklist
 function removeSite(site) {
   chrome.runtime.sendMessage({ type: "REMOVE_SITE", site }, (res) => {
-    if (res && res.ok) {
-      blocklist = res.blocklist;
-      renderList();
-      updateStats();
-    }
+    if (res && res.ok) { blocklist = res.blocklist; renderBlocklist(); updateStats(); }
+  });
+}
+
+// Remove from whitelist
+function removeWhitesite(site) {
+  chrome.runtime.sendMessage({ type: "REMOVE_WHITELIST", site }, (res) => {
+    if (res && res.ok) { whitelist = res.whitelist; renderWhitelist(); }
   });
 }
 
 // Render blocklist
-function renderList() {
+function renderBlocklist() {
   listCountEl.textContent = blocklist.length;
-
   if (blocklist.length === 0) {
-    blocklistEl.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">🔓</div>
-        No sites blocked yet
-      </div>`;
+    blocklistEl.innerHTML = `<div class="empty-state"><div class="empty-icon">🔓</div>No sites blocked yet</div>`;
     return;
   }
-
-  blocklistEl.innerHTML = blocklist
-    .map(
-      (site) => `
+  blocklistEl.innerHTML = blocklist.map(site => `
     <div class="site-item">
-      <div class="site-info">
-        <div class="site-dot"></div>
-        <span class="site-name" title="${site}">${site}</span>
-      </div>
+      <div class="site-info"><div class="site-dot" style="background:#ef4444"></div>
+        <span class="site-name" title="${site}">${site}</span></div>
       <button class="btn-remove" data-site="${site}" title="Remove">✕</button>
-    </div>`
-    )
-    .join("");
+    </div>`).join("");
+  blocklistEl.querySelectorAll(".btn-remove").forEach(btn =>
+    btn.addEventListener("click", () => removeSite(btn.dataset.site)));
+}
 
-  blocklistEl.querySelectorAll(".btn-remove").forEach((btn) => {
-    btn.addEventListener("click", () => removeSite(btn.dataset.site));
-  });
+// Render whitelist
+function renderWhitelist() {
+  wlistCountEl.textContent = whitelist.length;
+  if (whitelist.length === 0) {
+    whitelistEl.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div>No sites whitelisted yet</div>`;
+    return;
+  }
+  whitelistEl.innerHTML = whitelist.map(site => `
+    <div class="site-item">
+      <div class="site-info"><div class="site-dot" style="background:#22c55e"></div>
+        <span class="site-name" title="${site}">${site}</span></div>
+      <button class="btn-remove" data-site="${site}" title="Remove">✕</button>
+    </div>`).join("");
+  whitelistEl.querySelectorAll(".btn-remove").forEach(btn =>
+    btn.addEventListener("click", () => removeWhitesite(btn.dataset.site)));
 }
 
 function updateStats() {
