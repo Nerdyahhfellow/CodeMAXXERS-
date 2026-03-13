@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>Blocked by Shield</title>
+  <title>Shield Protected You</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       min-height: 100vh;
-      background: #0a0d14;
+      background:linear-gradient(135deg,#000000,#2b2fff);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -15,14 +15,14 @@
       color: #e2e8f0;
       padding: 24px 16px;
     }
-    .container { max-width: 560px; width: 100%; }
+    .container { max-width: 700px; width: 100%; }
     .top { text-align: center; margin-bottom: 24px; }
-    .threat-icon { font-size: 64px; display: block; margin-bottom: 14px; animation: float 3s ease-in-out infinite; }
+    .threat-icon { font-size: 80px; display: block; margin-bottom: 14px; animation: float 4s ease-in-out infinite; }
     @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
     .badge {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 5px 16px; border-radius: 20px; font-size: 12px;
-      font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px;
+      font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px;
     }
     .badge-dot { width:7px;height:7px;border-radius:50%;animation:blink 1.2s ease-in-out infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
@@ -34,21 +34,21 @@
     .badge.gray  .badge-dot { background:#94a3b8; }
     h1 { font-size:28px;font-weight:800;margin-bottom:8px;letter-spacing:-0.4px; }
     .subtitle { font-size:14px;color:#64748b;line-height:1.55; }
-    .url-box { background:#0d1017;border:1px solid #1e2a3a;border-radius:10px;padding:11px 14px;margin-bottom:20px; }
-    .source-row { text-align:center;font-size:11px;color:#374151;margin-bottom:20px; }
+    .url-box { background:#7563ff;font-size:18px;border:1px solid #1e2a3a;border-radius:20px;padding:30px;margin-bottom:20px;text-align: center; }
+    .source-row { text-align:center;font-size:16px;color:#ffffff;margin-bottom:20px; }
     .actions { display:flex;gap:10px; }
-    .btn { padding:12px 0;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:opacity 0.15s,transform 0.1s;flex:1;text-align:center; }
+    .btn { padding:25px 0;border-radius:9px;margin:40px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:opacity 0.15s,transform 0.1s;flex:1;text-align:center; }
     .btn:hover { opacity:0.85; }
     .btn:active { transform:scale(0.97); }
-    .btn-back { background:linear-gradient(135deg,#3b82f6,#6366f1);color:white; }
-    .btn-proceed { background:#131820;color:#64748b;border:1px solid #1e2a3a;font-size:12px; }
+    .btn-back { background:#857cc3;color:rgb(0, 0, 0);}
+    .btn-proceed { background:#857cc3;color:#000000;border:1px solid #1e2a3a;font-size:12px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="top">
       <span class="threat-icon" id="threat-icon">🛡️</span>
-      <div><span class="badge gray" id="reason-badge"><span class="badge-dot"></span><span id="badge-text">Blocked</span></span></div>
+      <div><span class="badge gray" id="reason-badge"><span class="badge-dot"></span><span id="badge-text">access denied</span></span></div>
       <h1 id="title">Site Blocked</h1>
       <p class="subtitle" id="subtitle">Shield has blocked this site.</p>
     </div>
@@ -61,8 +61,8 @@
     <div class="source-row" id="source-row"></div>
 
     <div class="actions">
-      <button class="btn btn-back" id="btn-back">← Go Back (Safe)</button>
-      <button class="btn btn-proceed" id="btn-proceed">Proceed at own risk</button>
+      <button class="btn btn-back" id="btn-back">Return</button>
+      <button class="btn btn-proceed" id="btn-proceed">Proceed</button>
     </div>
   </div>
 
