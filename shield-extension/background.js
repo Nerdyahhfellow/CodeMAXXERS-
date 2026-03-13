@@ -62,7 +62,7 @@ function localClassify(url) {
 // Covers: malware, phishing, unwanted software, social engineering.
 const GSB_API_ENDPOINT = "https://safebrowsing.googleapis.com/v4/threatMatches:find";
 
-const BUILT_IN_API_KEY = "AIzaSyBqtbffcbwEWA7xr3N4rsOst0PnejlcWXA";
+const BUILT_IN_API_KEY = "AIzaSyBqtbffcbwEWA7xr3N4rsOst0PnejlcWXA"; // Google Safe Browsing
 
 async function checkGoogleSafeBrowsing(url) {
   const { safeBrowsingApiKey } = await new Promise((resolve) =>
@@ -389,15 +389,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false;
   }
 
-  if (msg.type === "GET_STATUS") {
-    chrome.storage.local.get(
-      { blocklist: [], whitelist: [], enabled: true, safeBrowsingApiKey: "", totalBlocked: 0 },
-      sendResponse
-    );
-    return true;
-  }
 
-  if (msg.type === "SET_ENABLED") {
+  if (msg.type === "GET_STATUS") {
     chrome.storage.local.set({ enabled: msg.value }, () => sendResponse({ ok: true }));
     return true;
   }

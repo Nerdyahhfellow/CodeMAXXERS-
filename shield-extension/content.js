@@ -50,9 +50,25 @@
     /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/.*login/i,
     /free-gift-claim\./i, /you-have-won\./i,
     /prize-claim\./i, /click-here-now\./i,
-    /verify.*account/i, /confirm.*identity/i,
-    /update.*billing/i, /suspended.*account/i,
   ];
+
+  // Trusted root domains — never flag these regardless of subdomains or patterns
+  const TRUSTED_ROOTS = new Set([
+    'google.com', 'googleapis.com', 'gstatic.com', 'googleusercontent.com',
+    'youtube.com', 'gmail.com', 'googlevideo.com', 'googletagmanager.com',
+    'microsoft.com', 'live.com', 'outlook.com', 'office.com', 'office365.com',
+    'microsoftonline.com', 'azure.com', 'bing.com', 'msn.com',
+    'apple.com', 'icloud.com',
+    'amazon.com', 'amazonaws.com', 'aws.amazon.com',
+    'facebook.com', 'instagram.com', 'whatsapp.com', 'meta.com',
+    'twitter.com', 'x.com', 'linkedin.com',
+    'github.com', 'githubusercontent.com',
+    'reddit.com', 'discord.com', 'spotify.com',
+    'netflix.com', 'dropbox.com', 'tiktok.com', 'snapchat.com',
+    'paypal.com', 'ebay.com', 'steam.com', 'steampowered.com',
+    'coinbase.com', 'binance.com', 'kraken.com',
+    'chase.com', 'wellsfargo.com', 'bankofamerica.com', 'citibank.com',
+  ]);
 
   // ─── Detection ───────────────────────────────────────────────────────────────
 
@@ -105,6 +121,10 @@
       const parsed = new URL(url);
       const hostname = parsed.hostname;
       const parts = hostname.split('.');
+      const root = parts.slice(-2).join('.');
+
+      // Skip all checks for trusted domains
+      if (TRUSTED_ROOTS.has(root)) return threats;
 
       // 1. Phishing patterns
       if (PHISHING_PATTERNS.some(p => p.test(url))) {
@@ -125,7 +145,6 @@
 
       // 3. Subdomain abuse: brand used as subdomain on different root
       if (parts.length > 3) {
-        const root = parts.slice(-2).join('.');
         const subparts = parts.slice(0, -2);
         for (const brand of BRAND_TARGETS) {
           if (subparts.includes(brand) && !root.startsWith(brand)) {
