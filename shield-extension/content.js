@@ -113,7 +113,7 @@
     return { detected: false };
   }
 
-  const DANGEROUS_EXTENSIONS = /\.(exe|msi|bat|cmd|scr|pif|com|vbs|vbe|js|jse|wsf|wsh|ps1|ps2|reg|lnk|dll|dmg|pkg|deb|rpm|apk|ipa|crx|xpi|cab|inf|sys|drv|bin|run|sh|bash|jar|class|appimage|gadget|hta|cpl|msp|mst|msc|psc1|psc2|application)$/i;
+  const DANGEROUS_EXTENSIONS = /\.(exe|msi|bat|cmd|scr|pif|vbs|vbe|jse|wsf|wsh|ps1|ps2|reg|lnk|dll|dmg|pkg|deb|rpm|apk|ipa|crx|xpi|cab|inf|sys|drv|appimage|gadget|hta|cpl|msp|mst|msc|psc1|psc2)$/i;
 
   function analyzeUrl(url) {
     const threats = [];
@@ -463,20 +463,36 @@
     root.querySelectorAll('a[href]').forEach(attachLink);
   }
 
-  // Check enabled state first
+  // Check enabled state first, then listen for runtime changes
   chrome.storage.local.get({ enabled: true }, ({ enabled }) => {
-    if (!enabled) return;
+    if (enabled) startScanning();
+  });
+
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === "SET_ENABLED") {
+      if (msg.value) {
+        startScanning();
+      } else {
+        stopScanning();
+      }
+    }
+  });
+
+  let observer = null;
+  let scanningActive = false;
+
+  function startScanning() {
+    if (scanningActive) return;
+    scanningActive = true;
 
     injectBadgeStyles();
     attachAll(document);
     badgeAll(document);
 
-    // Watch for dynamically injected links — debounced so rapid DOM changes
-    // don't trigger hundreds of scans per second
     let debounceTimer = null;
     const pendingNodes = new Set();
 
-    new MutationObserver(mutations => {
+    observer = new MutationObserver(mutations => {
       for (const m of mutations)
         for (const node of m.addedNodes)
           if (node.nodeType === 1) pendingNodes.add(node);
@@ -489,8 +505,25 @@
           badgeAll(node);
         }
         pendingNodes.clear();
-      }, 200); // batch all changes within 200ms into one pass
-    }).observe(document.body, { childList: true, subtree: true });
-  });
+      }, 200);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function stopScanning() {
+    if (!scanningActive) return;
+    scanningActive = false;
+    if (observer) { observer.disconnect(); observer = null; }
+    // Remove all badges
+    document.querySelectorAll('.__shield_badge__').forEach(el => el.remove());
+    // Remove red outlines
+    document.querySelectorAll('a[href]').forEach(a => {
+      a.style.outline = '';
+      a.style.outlineOffset = '';
+      a.style.borderRadius = '';
+      a.__shieldBadged = false;
+    });
+    hideTooltip();
+  }
 
 })();

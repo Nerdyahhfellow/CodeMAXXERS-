@@ -34,7 +34,7 @@ chrome.runtime.sendMessage({ type: "GET_STATUS" }, (res) => {
 
   renderLists();
   updateStats();
-  if (!enabled) showDisabledOverlay();
+  if (!enabled) { showDisabledOverlay(); setProtectionStatus(false); }
 });
 
 // Tab switching
@@ -63,8 +63,26 @@ enabledToggle.addEventListener("change", () => {
   enabled = enabledToggle.checked;
   toggleStatus.textContent = enabled ? "ON" : "OFF";
   chrome.runtime.sendMessage({ type: "SET_ENABLED", value: enabled });
-  if (!enabled) showDisabledOverlay(); else removeDisabledOverlay();
+  if (!enabled) { showDisabledOverlay(); setProtectionStatus(false); }
+  else { removeDisabledOverlay(); setProtectionStatus(true); }
 });
+
+function setProtectionStatus(active) {
+  const dot  = document.getElementById("protection-dot");
+  const text = document.getElementById("protection-text");
+  const badge = document.getElementById("protection-status");
+  if (active) {
+    dot.style.background = "#22c55e";
+    dot.style.animation = "pulse 2s infinite";
+    text.textContent = "Phishing protection active";
+    badge.style.color = "#22c55e";
+  } else {
+    dot.style.background = "#ef4444";
+    dot.style.animation = "none";
+    text.textContent = "Protection offline";
+    badge.style.color = "#ef4444";
+  }
+}
 
 function showDisabledOverlay() {
   if (document.getElementById("disabled-overlay")) return;

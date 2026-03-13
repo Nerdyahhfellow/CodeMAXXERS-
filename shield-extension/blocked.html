@@ -7,7 +7,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       min-height: 100vh;
-      background:linear-gradient(135deg,#000000,#2b2fff);
+      background:linear-gradient(135deg,#000000,#520d72);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -34,7 +34,7 @@
     .badge.gray  .badge-dot { background:#94a3b8; }
     h1 { font-size:28px;font-weight:800;margin-bottom:8px;letter-spacing:-0.4px; }
     .subtitle { font-size:14px;color:#64748b;line-height:1.55; }
-    .url-box { background:#7563ff;font-size:18px;border:1px solid #1e2a3a;border-radius:20px;padding:30px;margin-bottom:20px;text-align: center; }
+    .url-box { background:rgba(255,255,255,0.05);font-size:18px;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:30px;margin-bottom:20px;text-align: center; backdrop-filter:blur(10px); }
     .source-row { text-align:center;font-size:16px;color:#ffffff;margin-bottom:20px; }
     .actions { display:flex;gap:10px; }
     .btn { padding:25px 0;border-radius:9px;margin:40px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:opacity 0.15s,transform 0.1s;flex:1;text-align:center; }
@@ -42,6 +42,26 @@
     .btn:active { transform:scale(0.97); }
     .btn-back { background:#857cc3;color:rgb(0, 0, 0);}
     .btn-proceed { background:#857cc3;color:#000000;border:1px solid #1e2a3a;font-size:12px; }
+
+    /* AI Card */
+    .ai-card { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:20px; margin-bottom:20px; backdrop-filter:blur(10px); }
+    .ai-card-header { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+    .ai-icon { font-size:18px; }
+    .ai-title { font-size:13px; font-weight:700; color:#e2e8f0; text-transform:uppercase; letter-spacing:0.6px; flex:1; }
+    .ai-badge { font-size:11px; font-weight:800; padding:3px 10px; border-radius:20px; }
+    .ai-badge.low    { background:rgba(34,197,94,0.15);  color:#22c55e; border:1px solid rgba(34,197,94,0.3); }
+    .ai-badge.medium { background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); }
+    .ai-badge.high   { background:rgba(239,68,68,0.15);  color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
+    .ai-loading { display:flex; align-items:center; gap:10px; color:#64748b; font-size:13px; }
+    .ai-spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,0.1); border-top-color:#a855f7; border-radius:50%; animation:spin 0.8s linear infinite; flex-shrink:0; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .ai-score-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .ai-score-label { font-size:11px; color:#64748b; white-space:nowrap; }
+    .ai-score-bar-wrap { flex:1; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; }
+    .ai-score-bar { height:100%; border-radius:3px; transition:width 0.8s ease; }
+    .ai-score-num { font-size:13px; font-weight:700; white-space:nowrap; }
+    .ai-explanation { font-size:13px; color:#94a3b8; line-height:1.6; }
+    .ai-error { font-size:12px; color:#ffffff; }
   </style>
 </head>
 <body>
@@ -60,9 +80,34 @@
 
     <div class="source-row" id="source-row"></div>
 
+    <div class="ai-card" id="ai-card">
+      <div class="ai-card-header">
+        <span class="ai-icon">✨</span>
+        <span class="ai-title">AI Risk Analysis</span>
+        <span class="ai-badge" id="ai-score-badge"></span>
+      </div>
+      <div class="ai-body" id="ai-body">
+        <div class="ai-loading" id="ai-loading">
+          <div class="ai-spinner"></div>
+          <span>Analyzing URL with Gemini AI...</span>
+        </div>
+        <div class="ai-result" id="ai-result" style="display:none">
+          <div class="ai-score-row">
+            <span class="ai-score-label">Risk Score</span>
+            <div class="ai-score-bar-wrap">
+              <div class="ai-score-bar" id="ai-score-bar"></div>
+            </div>
+            <span class="ai-score-num" id="ai-score-num"></span>
+          </div>
+          <p class="ai-explanation" id="ai-explanation"></p>
+        </div>
+        <div class="ai-error" id="ai-error" style="display:none">Could not complete AI analysis.</div>
+      </div>
+    </div>
+
     <div class="actions">
-      <button class="btn btn-back" id="btn-back">Return</button>
-      <button class="btn btn-proceed" id="btn-proceed">Proceed</button>
+      <button class="btn btn-back" id="btn-back" style="font-size:20px;">Return</button>
+      <button class="btn btn-proceed" id="btn-proceed" style="font-size:20px;">Proceed</button>
     </div>
   </div>
 

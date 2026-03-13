@@ -28,7 +28,24 @@ const PHISHING_PATTERNS = [
 ];
 
 // Dangerous file extensions that should trigger a warning
-const DANGEROUS_EXTENSIONS = /\.(exe|msi|bat|cmd|scr|pif|com|vbs|vbe|js|jse|wsf|wsh|ps1|ps2|reg|lnk|dll|dmg|pkg|deb|rpm|apk|ipa|crx|xpi|cab|inf|sys|drv|bin|run|sh|bash|jar|class|appimage|gadget|hta|cpl|msp|mst|msc|psc1|psc2|application|deploy|manifest|xaml|workflow)$/i;
+const DANGEROUS_EXTENSIONS = /\.(exe|msi|bat|cmd|scr|pif|vbs|vbe|jse|wsf|wsh|ps1|ps2|reg|lnk|dll|dmg|pkg|deb|rpm|apk|ipa|crx|xpi|cab|inf|sys|drv|appimage|gadget|hta|cpl|msp|mst|msc|psc1|psc2)$/i;
+
+// Trusted roots — never flag these locally (GSB still runs)
+const TRUSTED_ROOTS = new Set([
+  'google.com', 'googleapis.com', 'gstatic.com', 'googleusercontent.com',
+  'youtube.com', 'gmail.com', 'googlevideo.com',
+  'microsoft.com', 'live.com', 'outlook.com', 'office.com', 'microsoftonline.com', 'azure.com', 'bing.com',
+  'apple.com', 'icloud.com',
+  'amazon.com', 'amazonaws.com',
+  'facebook.com', 'instagram.com', 'whatsapp.com', 'meta.com',
+  'twitter.com', 'x.com', 'linkedin.com',
+  'github.com', 'githubusercontent.com',
+  'reddit.com', 'discord.com', 'spotify.com',
+  'netflix.com', 'dropbox.com', 'tiktok.com', 'snapchat.com',
+  'paypal.com', 'ebay.com', 'steampowered.com',
+  'coinbase.com', 'binance.com', 'kraken.com',
+  'chase.com', 'wellsfargo.com', 'bankofamerica.com', 'citibank.com',
+]);
 
 // Cookie theft / credential harvesting indicators
 const COOKIE_THEFT_PATTERNS = [
@@ -51,6 +68,11 @@ function isDangerousDownload(url) {
 
 // Classify a URL locally — returns { threat, reason } like GSB
 function localClassify(url) {
+  try {
+    const host = new URL(url).hostname;
+    const root = host.split('.').slice(-2).join('.');
+    if (TRUSTED_ROOTS.has(root)) return { threat: false, reason: null };
+  } catch {}
   if (isPhishingUrl(url)) return { threat: true, reason: "phishing" };
   if (isDangerousDownload(url)) return { threat: true, reason: "malware" };
   if (COOKIE_THEFT_PATTERNS.some(p => p.test(url))) return { threat: true, reason: "phishing" };
@@ -390,8 +412,60 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
 
+  if (msg.type === "AI_ANALYZE") {
+    const url = msg.url;
+    const reason = msg.reason || "unknown";
+    const prompt = `You are a cybersecurity AI analyzing a blocked URL. The URL was blocked because: "${reason}".
+
+URL: ${url}
+
+Respond ONLY with a JSON object with exactly two fields:
+- "score": an integer 0-100 representing risk level (0=safe, 100=extremely dangerous)
+- "explanation": a 2-3 sentence plain-English explanation of why this URL is dangerous and what the attacker's likely goal is
+
+No markdown, no backticks, just the raw JSON object.`;
+
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${BUILT_IN_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 300 }
+      })
+    }).then(r => r.json()).then(data => {
+      console.log("[Shield AI_ANALYZE] response:", JSON.stringify(data).slice(0, 400));
+      const text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0].text;
+      if (!text) { sendResponse({ ok: false, error: JSON.stringify(data).slice(0, 200) }); return; }
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      sendResponse({ ok: true, score: parsed.score, explanation: parsed.explanation });
+    }).catch(err => {
+      console.error("[Shield AI_ANALYZE] error:", err);
+      sendResponse({ ok: false, error: err.message });
+    });
+    return true;
+  }
+
+
   if (msg.type === "GET_STATUS") {
-    chrome.storage.local.set({ enabled: msg.value }, () => sendResponse({ ok: true }));
+    chrome.storage.local.get(
+      { blocklist: [], whitelist: [], enabled: true, totalBlocked: 0 },
+      sendResponse
+    );
+    return true;
+  }
+
+  if (msg.type === "SET_ENABLED") {
+    chrome.storage.local.set({ enabled: msg.value }, () => {
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          chrome.tabs.sendMessage(tab.id, { type: "SET_ENABLED", value: msg.value }, () => {
+            chrome.runtime.lastError; // suppress error for tabs without content script
+          });
+        });
+      });
+      sendResponse({ ok: true });
+    });
     return true;
   }
 

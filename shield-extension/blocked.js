@@ -143,6 +143,61 @@
   document.getElementById("url-label").textContent       = cfg.urlLabel;
   document.getElementById("source-row").textContent      = cfg.source;
 
+  // ---- AI ANALYSIS ----
+  const GEMINI_KEY = "AIzaSyBqtbffcbwEWA7xr3N4rsOst0PnejlcWXA";
+
+  (function runAiAnalysis() {
+    if (!blocked) { document.getElementById("ai-card").style.display = "none"; return; }
+
+    var prompt = "You are a cybersecurity AI analyzing a blocked URL. The URL was blocked because: \"" + reason + "\".\n\nURL: " + blocked + "\n\nRespond ONLY with a JSON object with exactly two fields:\n- \"score\": an integer 0-100 representing risk level (0=safe, 100=extremely dangerous)\n- \"explanation\": a 2-3 sentence plain-English explanation of why this URL is dangerous and what the attacker's likely goal is\n\nNo markdown, no backticks, just the raw JSON object.";
+
+    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_KEY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 300 }
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById("ai-loading").style.display = "none";
+      var text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0].text;
+      if (!text) {
+        document.getElementById("ai-error").textContent = "AI error: " + JSON.stringify(data).slice(0, 150);
+        document.getElementById("ai-error").style.display = "block";
+        return;
+      }
+      var clean = text.replace(/```json|```/g, "").trim();
+      var parsed = JSON.parse(clean);
+      var score = Math.min(100, Math.max(0, parsed.score));
+      var color = score >= 70 ? "#ef4444" : score >= 40 ? "#f59e0b" : "#22c55e";
+      var level = score >= 70 ? "high" : score >= 40 ? "medium" : "low";
+      var label = score >= 70 ? "HIGH RISK" : score >= 40 ? "MEDIUM RISK" : "LOW RISK";
+
+      var badge = document.getElementById("ai-score-badge");
+      badge.textContent = label;
+      badge.className = "ai-badge " + level;
+
+      var bar = document.getElementById("ai-score-bar");
+      bar.style.width = "0%";
+      bar.style.background = color;
+      setTimeout(function() { bar.style.width = score + "%"; }, 50);
+
+      var numEl = document.getElementById("ai-score-num");
+      numEl.textContent = score + "/100";
+      numEl.style.color = color;
+
+      document.getElementById("ai-explanation").textContent = parsed.explanation;
+      document.getElementById("ai-result").style.display = "block";
+    })
+    .catch(function(err) {
+      document.getElementById("ai-loading").style.display = "none";
+      document.getElementById("ai-error").textContent = "AI error: " + err.message;
+      document.getElementById("ai-error").style.display = "block";
+    });
+  })();
+
   // ---- GO BACK BUTTON ----
   document.getElementById("btn-back").onclick = function() {
     if (prevUrl && prevUrl.indexOf("http") === 0) {
